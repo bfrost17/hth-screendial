@@ -4,6 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import "./styles/glass.css";
 import { PaletteComponent } from "./components/Palette";
 import { OverlayComponent } from "./components/Overlay";
+import { AuthModalComponent } from "./components/AuthModal";
+import { authService, AuthUserProfile } from "./services/auth0";
 import { AudioManager } from "./services/audio";
 import { ElevenLabsService } from "./services/elevenlabs";
 import { GeminiAgentService } from "./services/gemini";
@@ -40,9 +42,11 @@ class ScreendialApp {
   private gemini: GeminiAgentService;
   private palette: PaletteComponent;
   private overlay: OverlayComponent;
+  private authModal: AuthModalComponent;
 
   private currentActiveApp: string = "Desktop";
   private isPaletteOpen: boolean = false;
+  private isAuthenticated: boolean = false;
   private desktopLayout: any = null;
 
   private clientTools: ClientTool[] = [
@@ -76,6 +80,7 @@ class ScreendialApp {
         this.showStatus("Auto-capturing all monitors simultaneously.", false, "screen_info", 2000);
       },
       onClearChat: () => this.handleClearChat(),
+      onLogout: () => this.handleSignOut(),
       onToggleAudio: () => this.toggleAudioOutput(),
       initialAudioOutput: this.audio.isAudioOutputEnabled(),
       onClose: () => {
@@ -88,15 +93,46 @@ class ScreendialApp {
       },
     });
 
+    this.authModal = new AuthModalComponent({
+      onSuccess: (user) => {
+        this.handleAuthSuccess(user);
+      },
+    });
+
     // 2. Mount to DOM
     this.appRoot.appendChild(this.overlay.getElement());
     this.appRoot.appendChild(this.palette.getElement());
+    this.appRoot.appendChild(this.authModal.getElement());
 
     // 3. Setup Listeners, Layout & Monitors
     this.fetchDesktopLayout();
     this.setupTrayEvents();
     this.setupInteractiveRegionsSync();
     this.refreshActiveApp();
+
+    // 4. Authenticate & initialize
+    this.checkAuthAndStart();
+  }
+
+  private async checkAuthAndStart() {
+    await authService.init();
+    const authed = await authService.isAuthenticated();
+
+    if (authed) {
+      const user = await authService.getUser();
+      this.handleAuthSuccess(user);
+    } else {
+      this.isAuthenticated = false;
+      this.palette.hide();
+      this.isPaletteOpen = false;
+      this.authModal.show();
+      this.updateInteractiveRegions(true);
+    }
+  }
+
+  private handleAuthSuccess(user?: AuthUserProfile) {
+    this.isAuthenticated = true;
+    this.authModal.hide();
 
     // Reveal Command Palette on launch
     setTimeout(() => {
@@ -108,9 +144,21 @@ class ScreendialApp {
       console.warn("[Screendial] Gemini API Key is missing. Please set VITE_GOOGLE_GEMINI_KEY or VITE_GEMINI_API_KEY in your .env file.");
     } else {
       setTimeout(() => {
-        this.audio.speak("Screendial is ready.");
+        const name = user?.name ? `, ${user.name}` : "";
+        this.audio.speak(`Screendial is ready${name}.`);
       }, 700);
     }
+  }
+
+  private async handleSignOut() {
+    await authService.logout();
+    this.isAuthenticated = false;
+    this.palette.hide();
+    this.isPaletteOpen = false;
+    this.overlay.clear();
+    this.authModal.show();
+    this.audio.playSound("minimize");
+    this.updateInteractiveRegions(true);
   }
 
   public async showStatus(
@@ -193,7 +241,8 @@ class ScreendialApp {
   public updateInteractiveRegions(forceInteractive?: boolean) {
     const isForce =
       (forceInteractive ?? false) ||
-      this.palette.isCurrentlyDragging();
+      this.palette.isCurrentlyDragging() ||
+      this.authModal.isVisible();
 
     const elements = document.querySelectorAll<HTMLElement>(
       ".palette-box.visible, .status-pill.visible, .callout-bubble, .output-card, .output-widget-container, .interactive"
@@ -254,6 +303,12 @@ class ScreendialApp {
   }
 
   public async showPalette() {
+    if (!this.isAuthenticated) {
+      this.authModal.show();
+      this.updateInteractiveRegions(true);
+      return;
+    }
+
     try {
       await invoke("ensure_visible_cmd");
     } catch {
@@ -266,6 +321,12 @@ class ScreendialApp {
   }
 
   public async togglePalette() {
+    if (!this.isAuthenticated) {
+      this.authModal.show();
+      this.updateInteractiveRegions(true);
+      return;
+    }
+
     if (this.isPaletteOpen) {
       this.palette.hide();
       this.isPaletteOpen = false;
@@ -276,6 +337,11 @@ class ScreendialApp {
   }
 
   public async toggleVoice() {
+    if (!this.isAuthenticated) {
+      this.authModal.show();
+      this.updateInteractiveRegions(true);
+      return;
+    }
     if (!this.audio.recordingActive) {
       this.palette.setState("listening");
       this.palette.setVoiceActive(true);

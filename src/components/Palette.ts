@@ -16,6 +16,7 @@ export class PaletteComponent {
   private onToggleVoice: () => void;
   private onToggleAudio?: () => void;
   private onClearChat?: () => void;
+  private onLogout?: () => void;
   private onClose?: () => void;
   private onMinimizeWindow?: () => void;
   private onDragChange?: (isDragging: boolean) => void;
@@ -27,6 +28,7 @@ export class PaletteComponent {
     initialAudioOutput?: boolean;
     onCycleScreen?: () => void;
     onClearChat?: () => void;
+    onLogout?: () => void;
     onClose?: () => void;
     onMinimizeWindow?: () => void;
     onDragChange?: (isDragging: boolean) => void;
@@ -35,6 +37,7 @@ export class PaletteComponent {
     this.onToggleVoice = callbacks.onToggleVoice;
     this.onToggleAudio = callbacks.onToggleAudio;
     this.onClearChat = callbacks.onClearChat;
+    this.onLogout = callbacks.onLogout;
     this.onClose = callbacks.onClose;
     this.onMinimizeWindow = callbacks.onMinimizeWindow;
     this.onDragChange = callbacks.onDragChange;
@@ -109,6 +112,14 @@ export class PaletteComponent {
             </svg>
           </button>
 
+          <button class="voice-btn logout-btn" title="Sign Out">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+
           <button class="voice-btn hide-btn" title="Hide / Minimize Window">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -125,7 +136,9 @@ export class PaletteComponent {
     this.sendButton = this.container.querySelector(".send-btn")!;
     this.clearButton = this.container.querySelector(".clear-btn")!;
     this.audioButton = this.container.querySelector(".audio-btn")!;
-    this.voiceButton = this.container.querySelector(".voice-btn:not(.clear-btn):not(.send-btn):not(.audio-btn):not(.hide-btn)")!;
+    this.voiceButton = this.container.querySelector(
+      ".voice-btn:not(.clear-btn):not(.send-btn):not(.audio-btn):not(.hide-btn):not(.logout-btn)"
+    )!;
   }
 
   public showStatus(
@@ -311,6 +324,13 @@ export class PaletteComponent {
       e.stopPropagation();
       if (this.onToggleAudio) {
         this.onToggleAudio();
+      }
+    });
+
+    this.container.querySelector(".logout-btn")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (this.onLogout) {
+        this.onLogout();
       }
     });
 
