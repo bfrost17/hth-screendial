@@ -62,9 +62,11 @@
    ```
 
 2. **Configure API keys:**
-   Copy to `.env.local` and fill in the ElevenLabs API key and voice ID to enable transcription and speech output. Gemini can still be configured in the in-app Settings modal; alternatively, set:
+   Copy `.env` (or configure in `.env`) with your API keys:
    ```env
-   VITE_GEMINI_API_KEY=your_gemini_api_key_here
+   VITE_GOOGLE_GEMINI_KEY=your_gemini_api_key_here
+   VITE_ELEVENLABS_API_KEY=your_elevenlabs_key_here
+   VITE_ELEVENLABS_VOICE_ID=your_voice_id_here
    ```
    `VITE_` values are embedded in the frontend build. Use these keys only for local/private demos; do not distribute a build containing real API keys.
 
@@ -81,10 +83,8 @@
 | :--- | :--- |
 | `Cmd + Shift + Space` *(or Ctrl+Shift+Space)* | Toggle Floating Command Palette |
 | `Cmd + Shift + V` *(or Ctrl+Shift+V)* | Toggle Voice Command Recording |
-| **Orb Left Click** | Open Command Palette |
-| **Orb Right Click** | Toggle Voice Command Recording |
 | **System Tray Icon** | Access quick actions, voice toggle, or quit |
-| `Escape` | Dismiss Command Palette or active modal |
+| `Escape` | Dismiss Command Palette or active overlay |
 
 ---
 
@@ -110,10 +110,8 @@ screendial/
 │   └── general-gui/SKILL.md         # Fallback visual grounding
 ├── src/                             # TypeScript & Liquid Glass Frontend
 │   ├── components/
-│   │   ├── Orb.ts                   # Floating Assistive Orb
 │   │   ├── Palette.ts               # Command Palette (Nav Bar)
-│   │   ├── Overlay.ts               # Fullscreen highlight & widget canvas
-│   │   └── SettingsModal.ts         # API Key & preferences modal
+│   │   └── Overlay.ts               # Fullscreen highlight & widget canvas
 │   ├── services/
 │   │   ├── audio.ts                 # Sound effects, mic recording, & TTS
 │   │   └── gemini.ts                # Gemini multimodal agent & tool caller

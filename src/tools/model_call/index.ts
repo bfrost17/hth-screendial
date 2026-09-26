@@ -26,11 +26,14 @@ export class ModelCallTool {
 
   constructor() {
     this.apiKey =
+      (import.meta.env.VITE_GOOGLE_GEMINI_KEY as string)?.trim() ||
+      (import.meta.env.VITE_GEMINI_API_KEY as string)?.trim() ||
       localStorage.getItem("screendial_api_key") ||
-      (import.meta.env.VITE_GEMINI_API_KEY as string) ||
       "";
     this.modelName =
-      localStorage.getItem("screendial_model") || "gemini-3.5-flash";
+      (import.meta.env.VITE_GEMINI_MODEL as string)?.trim() ||
+      localStorage.getItem("screendial_model") ||
+      "gemini-2.5-flash";
     this.loadHistory();
   }
 
@@ -114,7 +117,7 @@ export class ModelCallTool {
     audioMimeType?: string;
   }): Promise<ToolCall[]> {
     if (!this.hasApiKey()) {
-      throw new Error("GEMINI_API_KEY is not set. Please provide your API key in Settings.");
+      throw new Error("Gemini API key is not configured. Please set VITE_GOOGLE_GEMINI_KEY or VITE_GEMINI_API_KEY in your .env file.");
     }
 
     const appName = params.activeApp || "Desktop";

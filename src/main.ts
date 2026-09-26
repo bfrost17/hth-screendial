@@ -4,7 +4,6 @@ import { listen } from "@tauri-apps/api/event";
 import "./styles/glass.css";
 import { PaletteComponent } from "./components/Palette";
 import { OverlayComponent } from "./components/Overlay";
-import { SettingsModalComponent } from "./components/SettingsModal";
 import { AudioManager } from "./services/audio";
 import { ElevenLabsService } from "./services/elevenlabs";
 import { GeminiAgentService } from "./services/gemini";
@@ -41,12 +40,9 @@ class ScreendialApp {
   private gemini: GeminiAgentService;
   private palette: PaletteComponent;
   private overlay: OverlayComponent;
-  private settingsModal: SettingsModalComponent;
 
   private currentActiveApp: string = "Desktop";
-  private isModalOpen: boolean = false;
   private isPaletteOpen: boolean = false;
-  private detectedDisplays: any[] = [];
   private desktopLayout: any = null;
 
   private clientTools: ClientTool[] = [
@@ -76,7 +72,6 @@ class ScreendialApp {
     this.palette = new PaletteComponent({
       onSubmit: (query) => this.handleTextQuery(query),
       onToggleVoice: () => this.toggleVoice(),
-      onOpenSettings: () => this.openSettings(),
       onCycleScreen: () => {
         this.showStatus("Auto-capturing all monitors simultaneously.", false, "screen_info", 2000);
       },
@@ -93,19 +88,9 @@ class ScreendialApp {
       },
     });
 
-    this.settingsModal = new SettingsModalComponent({
-      onSave: (key, model) => {
-        this.gemini.setApiKey(key);
-        this.gemini.setModelName(model);
-        this.isModalOpen = false;
-        this.updateInteractiveRegions();
-      },
-    });
-
     // 2. Mount to DOM
     this.appRoot.appendChild(this.overlay.getElement());
     this.appRoot.appendChild(this.palette.getElement());
-    this.appRoot.appendChild(this.settingsModal.getElement());
 
     // 3. Setup Listeners, Layout & Monitors
     this.fetchDesktopLayout();
@@ -120,7 +105,7 @@ class ScreendialApp {
 
     // Check API Key on launch
     if (!this.gemini.hasApiKey()) {
-      setTimeout(() => this.openSettings(), 1200);
+      console.warn("[Screendial] Gemini API Key is missing. Please set VITE_GOOGLE_GEMINI_KEY or VITE_GEMINI_API_KEY in your .env file.");
     } else {
       setTimeout(() => {
         this.audio.speak("Screendial is ready.");
@@ -208,11 +193,10 @@ class ScreendialApp {
   public updateInteractiveRegions(forceInteractive?: boolean) {
     const isForce =
       (forceInteractive ?? false) ||
-      this.isModalOpen ||
       this.palette.isCurrentlyDragging();
 
     const elements = document.querySelectorAll<HTMLElement>(
-      ".palette-box.visible, .status-pill.visible, .modal-box, .callout-bubble, .output-card, .output-widget-container, .interactive"
+      ".palette-box.visible, .status-pill.visible, .callout-bubble, .output-card, .output-widget-container, .interactive"
     );
 
     const rects: LogicalRect[] = [];
@@ -429,30 +413,6 @@ class ScreendialApp {
     }
 
     this.updateInteractiveRegions();
-  }
-
-  public async openSettings() {
-    this.isModalOpen = true;
-    try {
-      const displays = await invoke<any[]>("get_display_info_cmd");
-      this.detectedDisplays = displays.map((d) => ({
-        index: d.id,
-        name: d.name,
-        width: d.width,
-        height: d.height,
-        is_primary: d.is_primary,
-      }));
-    } catch (err) {
-      console.warn("[Screendial] Failed to query display info:", err);
-      this.detectedDisplays = [];
-    }
-
-    this.settingsModal.show(
-      this.gemini.getApiKey(),
-      this.gemini.getModelName(),
-      this.detectedDisplays
-    );
-    this.updateInteractiveRegions(true);
   }
 }
 
