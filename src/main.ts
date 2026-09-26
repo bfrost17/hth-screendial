@@ -6,6 +6,7 @@ import { PaletteComponent } from "./components/Palette";
 import { OverlayComponent } from "./components/Overlay";
 import { SettingsModalComponent } from "./components/SettingsModal";
 import { AudioManager } from "./services/audio";
+import { ElevenLabsService } from "./services/elevenlabs";
 import { GeminiAgentService } from "./services/gemini";
 import { resolveSkill } from "./skills";
 import {
@@ -36,6 +37,7 @@ export interface LogicalRect {
 class ScreendialApp {
   private appRoot: HTMLElement;
   private audio: AudioManager;
+  private elevenLabs: ElevenLabsService;
   private gemini: GeminiAgentService;
   private palette: PaletteComponent;
   private overlay: OverlayComponent;
@@ -57,7 +59,8 @@ class ScreendialApp {
 
   constructor() {
     this.appRoot = document.getElementById("app")!;
-    this.audio = new AudioManager(false); // Audio output muted initially
+    this.elevenLabs = new ElevenLabsService();
+    this.audio = new AudioManager(false, this.elevenLabs); // Audio output muted initially
     this.gemini = new GeminiAgentService();
 
     // Always clear history on app launch
@@ -305,9 +308,22 @@ class ScreendialApp {
       this.palette.setVoiceActive(false);
       this.hideStatus("voice");
       this.showStatus("Processing audio...", true, "processing");
-      const audioBase64 = await this.audio.stopRecording();
-      if (audioBase64) {
-        await this.processQuery(undefined, audioBase64);
+      const recordedAudio = await this.audio.stopRecording();
+      if (recordedAudio) {
+        if (this.elevenLabs.canTranscribe()) {
+          try {
+            const transcript = await this.elevenLabs.transcribe({
+              audio: recordedAudio.blob,
+              mimeType: recordedAudio.mimeType,
+            });
+            await this.processQuery(transcript);
+          } catch (err) {
+            console.warn("[Screendial] ElevenLabs transcription failed; sending audio to Gemini:", err);
+            await this.processQuery(undefined, recordedAudio.base64, recordedAudio.mimeType);
+          }
+        } else {
+          await this.processQuery(undefined, recordedAudio.base64, recordedAudio.mimeType);
+        }
       } else {
         this.palette.setState("idle");
         this.hideStatus("processing");
@@ -333,7 +349,7 @@ class ScreendialApp {
     await this.processQuery(query, undefined);
   }
 
-  private async processQuery(query?: string, audioBase64?: string) {
+  private async processQuery(query?: string, audioBase64?: string, audioMimeType?: string) {
     this.palette.setState("processing");
     this.showStatus("Analyzing screens & active app...", true, "processing");
     this.audio.playSound("processing");
@@ -352,7 +368,8 @@ class ScreendialApp {
         query,
         audioBase64,
         activeApp,
-        activeSkill
+        activeSkill,
+        audioMimeType
       );
 
       // 3. Dispatch returned Tool Calls directly on this instance's overlay
@@ -381,8 +398,24 @@ class ScreendialApp {
     // Clear previous highlights to redraw freshly
     this.overlay.clear();
 
+    const highlightedScreens = new Set(
+      actions
+        .filter((action) => action.tool === "highlight")
+        .map((action) => String(action.args.screen_id ?? "0"))
+    );
+
     // Polymorphically execute independent client tools
     for (const action of actions) {
+      if (
+        action.tool === "overlay" &&
+        highlightedScreens.has(String(action.args.screen_id ?? "0"))
+      ) {
+        console.info(
+          `[Screendial] Suppressing duplicate overlay on Screen ${action.args.screen_id ?? "0"} because a highlight already provides a callout.`
+        );
+        continue;
+      }
+
       const toolInstance = this.clientTools.find((t) => t.name === action.tool);
       if (toolInstance) {
         try {

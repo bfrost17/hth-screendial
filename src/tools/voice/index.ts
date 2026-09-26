@@ -27,7 +27,7 @@ export class VoiceTool implements ClientTool {
   public async execute(args: VoiceArgs, _overlayInstance: any, audioInstance: any): Promise<void> {
     console.log("[VoiceTool] Synthesizing spoken voice:", args.text);
     if (audioInstance && typeof audioInstance.speak === "function") {
-      audioInstance.speak(args.text);
+      await audioInstance.speak(args.text);
     }
   }
 }

@@ -13,7 +13,8 @@ export class GeminiAgentService extends ModelCallTool {
     userQuery?: string,
     audioBase64?: string,
     activeApp?: string,
-    skill?: any
+    skill?: any,
+    audioMimeType?: string
   ): Promise<any> {
     // If we receive a single screen object rather than a dictionary (from legacy callers),
     // wrap it into a dictionary under key "0" (primary).
@@ -26,7 +27,8 @@ export class GeminiAgentService extends ModelCallTool {
       userQuery,
       audioBase64,
       activeApp,
-      skill
+      skill,
+      audioMimeType
     });
   }
 }

@@ -61,11 +61,12 @@
    npm install
    ```
 
-2. **Configure Gemini API Key:**
-   You can enter your API key directly in the in-app Settings modal, or set an environment variable in `.env`:
+2. **Configure API keys:**
+   Copy to `.env.local` and fill in the ElevenLabs API key and voice ID to enable transcription and speech output. Gemini can still be configured in the in-app Settings modal; alternatively, set:
    ```env
    VITE_GEMINI_API_KEY=your_gemini_api_key_here
    ```
+   `VITE_` values are embedded in the frontend build. Use these keys only for local/private demos; do not distribute a build containing real API keys.
 
 3. **Launch in Development Mode:**
    ```bash

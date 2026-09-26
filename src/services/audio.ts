@@ -1,20 +1,37 @@
+import { ElevenLabsService } from "./elevenlabs";
+
+export interface RecordedAudio {
+  blob: Blob;
+  base64: string;
+  mimeType: string;
+}
+
 export class AudioManager {
   private sounds: Map<string, HTMLAudioElement> = new Map();
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
   private isRecording: boolean = false;
-
   private isAudioEnabled: boolean = false;
+  private speechAudio: HTMLAudioElement | null = null;
+  private elevenLabs: ElevenLabsService;
 
-  constructor(initialAudioEnabled: boolean = false) {
+  constructor(
+    initialAudioEnabled: boolean = false,
+    elevenLabs: ElevenLabsService = new ElevenLabsService()
+  ) {
     this.isAudioEnabled = initialAudioEnabled;
+    this.elevenLabs = elevenLabs;
     this.preloadSounds();
   }
 
   public setAudioEnabled(enabled: boolean): void {
     this.isAudioEnabled = enabled;
-    if (!enabled && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
+    if (!enabled) {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      this.speechAudio?.pause();
+      this.speechAudio = null;
     }
   }
 
@@ -74,22 +91,35 @@ export class AudioManager {
     }
   }
 
-  public async stopRecording(): Promise<string | null> {
+  public async stopRecording(): Promise<RecordedAudio | null> {
     if (!this.mediaRecorder || !this.isRecording) return null;
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.mediaRecorder!.onstop = async () => {
-        const audioBlob = new Blob(this.audioChunks, { type: "audio/wav" });
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = () => {
-          const base64Data = (reader.result as string).split(",")[1];
-          resolve(base64Data);
-        };
-        // Stop audio tracks
+        const mimeType =
+          this.mediaRecorder?.mimeType ||
+          this.audioChunks.find((chunk) => chunk.type)?.type ||
+          "application/octet-stream";
+        const audioBlob = new Blob(this.audioChunks, { type: mimeType });
         this.mediaRecorder?.stream.getTracks().forEach((track) => track.stop());
         this.isRecording = false;
         this.playSound("listening_ended");
+
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read recorded audio."));
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          if (typeof reader.result !== "string") {
+            reject(new Error("Could not encode recorded audio."));
+            return;
+          }
+          const base64Data = reader.result.split(",")[1];
+          if (!base64Data) {
+            reject(new Error("Recorded audio was empty."));
+            return;
+          }
+          resolve({ blob: audioBlob, base64: base64Data, mimeType });
+        };
       };
 
       this.mediaRecorder!.stop();
@@ -111,9 +141,95 @@ export class AudioManager {
       return;
     }
 
+    if (this.elevenLabs.canSpeak()) {
+      void this.speakWithElevenLabs(text, onStart, onDone);
+      return;
+    }
+
+    this.speakWithBrowser(text, onStart, onDone);
+  }
+
+  private async speakWithElevenLabs(
+    text: string,
+    onStart?: () => void,
+    onDone?: () => void
+  ): Promise<void> {
+    try {
+      const audioBlob = await this.elevenLabs.synthesizeSpeech(text);
+      if (!this.isAudioEnabled) {
+        onDone?.();
+        return;
+      }
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      this.speechAudio = audio;
+      let finished = false;
+      const cleanup = () => {
+        if (finished) return;
+        finished = true;
+        audio.onended = null;
+        audio.onerror = null;
+        audio.onpause = null;
+        URL.revokeObjectURL(audioUrl);
+        if (this.speechAudio === audio) this.speechAudio = null;
+      };
+      const useBrowserFallback = () => {
+        if (finished) return;
+        cleanup();
+        if (this.isAudioEnabled) {
+          this.speakWithBrowser(text, onStart, onDone);
+        } else {
+          onDone?.();
+        }
+      };
+
+      audio.onplay = () => onStart?.();
+      audio.onended = () => {
+        cleanup();
+        this.playSound("agent_done");
+        onDone?.();
+      };
+      audio.onerror = () => {
+        console.warn("[AudioManager] ElevenLabs audio playback failed; using browser speech.");
+        useBrowserFallback();
+      };
+      audio.onpause = () => {
+        if (!this.isAudioEnabled) {
+          cleanup();
+          onDone?.();
+        }
+      };
+
+      try {
+        await audio.play();
+      } catch (err) {
+        console.warn("[AudioManager] ElevenLabs audio could not start; using browser speech:", err);
+        useBrowserFallback();
+      }
+    } catch (err) {
+      console.warn("[AudioManager] ElevenLabs speech failed; using browser speech:", err);
+      if (this.isAudioEnabled) {
+        this.speakWithBrowser(text, onStart, onDone);
+      } else {
+        onDone?.();
+      }
+    }
+  }
+
+  private speakWithBrowser(
+    text: string,
+    onStart?: () => void,
+    onDone?: () => void
+  ): void {
+    if (!this.isAudioEnabled) {
+      onDone?.();
+      return;
+    }
+
     if (!("speechSynthesis" in window)) {
-      if (onStart) onStart();
-      if (onDone) onDone();
+      onStart?.();
+      onDone?.();
       return;
     }
 
@@ -142,18 +258,18 @@ export class AudioManager {
     let started = false;
     utterance.onstart = () => {
       started = true;
-      if (onStart) onStart();
+      onStart?.();
     };
 
     utterance.onend = () => {
       this.playSound("agent_done");
-      if (onDone) onDone();
+      onDone?.();
     };
 
     utterance.onerror = (e) => {
       console.warn("Speech synthesis error:", e);
-      if (!started && onStart) onStart();
-      if (onDone) onDone();
+      if (!started) onStart?.();
+      onDone?.();
     };
 
     window.speechSynthesis.speak(utterance);

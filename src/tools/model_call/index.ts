@@ -111,6 +111,7 @@ export class ModelCallTool {
     audioBase64?: string;
     activeApp?: string;
     skill?: Skill;
+    audioMimeType?: string;
   }): Promise<ToolCall[]> {
     if (!this.hasApiKey()) {
       throw new Error("GEMINI_API_KEY is not set. Please provide your API key in Settings.");
@@ -142,8 +143,9 @@ ${displayLayoutContext}
 RULES FOR PRESENTATION:
 1. Observe the provided screen captures and identify which screen/monitor ID is relevant to answer or fulfill the user request.
 2. Under 'highlight', coordinates 'box_2d' are normalized [ymin, xmin, ymax, xmax] from 0 to 1000 relative to that specific screen's width and height.
-3. You can present normal text guides via 'overlay', code snippets via 'code_overlay', and checklists via 'to_do_overlay'. Make sure to specify the correct target 'screen_id' as a string (e.g. "0", "1") for each tool.
-4. Always accompany visual overlays with 'voice' spoken guidance providing clear, succinct audio feedback.
+3. A 'highlight' already displays a labeled callout with its explanation. When highlighting an element, do not also use 'overlay' for the same screen or repeat that explanation in another card. Use 'overlay' for guidance that does not need a highlighted element.
+4. You can present code snippets via 'code_overlay' and checklists via 'to_do_overlay'. Make sure to specify the correct target 'screen_id' as a string (e.g. "0", "1") for each tool.
+5. Always accompany visual overlays with 'voice' spoken guidance providing clear, succinct audio feedback.
 `;
 
     const contentsParts: any[] = [];
@@ -164,7 +166,7 @@ RULES FOR PRESENTATION:
     if (params.audioBase64) {
       contentsParts.push({
         inlineData: {
-          mimeType: "audio/wav",
+          mimeType: params.audioMimeType || "audio/wav",
           data: params.audioBase64
         }
       });
