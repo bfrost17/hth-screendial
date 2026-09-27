@@ -29,6 +29,77 @@ pub struct InteractiveState {
     pub force_interactive: Arc<AtomicBool>,
 }
 
+use std::io::Write;
+use std::process::{Command, Stdio};
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct HttpResponse {
+    pub status: u16,
+    pub body: String,
+}
+
+#[tauri::command]
+fn log_terminal_cmd(message: String) {
+    println!("{}", message);
+}
+
+#[tauri::command]
+fn http_request_cmd(
+    url: String,
+    method: String,
+    headers: Vec<(String, String)>,
+    body: Option<String>,
+) -> Result<HttpResponse, String> {
+    let mut cmd = Command::new("curl");
+    cmd.arg("-s")
+        .arg("-w")
+        .arg("\n__STATUS__:%{http_code}")
+        .arg("-X")
+        .arg(&method)
+        .arg(&url);
+
+    for (k, v) in headers {
+        cmd.arg("-H").arg(format!("{}: {}", k, v));
+    }
+
+    if body.is_some() {
+        cmd.arg("--data-binary").arg("@-");
+        cmd.stdin(Stdio::piped());
+    }
+
+    let mut child = cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn curl: {}", e))?;
+
+    if let Some(b) = body {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(b.as_bytes());
+        }
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed to wait for curl: {}", e))?;
+
+    let raw = String::from_utf8_lossy(&output.stdout);
+    if let Some(pos) = raw.rfind("\n__STATUS__:") {
+        let (body_part, status_part) = raw.split_at(pos);
+        let status_str = status_part.trim_start_matches("\n__STATUS__:");
+        let status_code: u16 = status_str.trim().parse().unwrap_or(0);
+        Ok(HttpResponse {
+            status: status_code,
+            body: body_part.to_string(),
+        })
+    } else {
+        Ok(HttpResponse {
+            status: 200,
+            body: raw.to_string(),
+        })
+    }
+}
+
 #[tauri::command]
 fn update_interactive_rects_cmd(
     state: tauri::State<InteractiveState>,
@@ -533,6 +604,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            log_terminal_cmd,
+            http_request_cmd,
             minimize_window_cmd,
             toggle_visibility_cmd,
             ensure_visible_cmd,
