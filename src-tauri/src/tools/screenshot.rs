@@ -1,9 +1,32 @@
 use super::get_display_info::{GetDisplayInfoTool, DisplayInfo};
+#[cfg(target_os = "macos")]
+use super::macos_capture;
 use xcap::Monitor;
-use image::{imageops::FilterType, DynamicImage, ImageFormat};
+use image::{imageops::FilterType, DynamicImage, ImageFormat, RgbaImage};
 use std::collections::HashMap;
 use std::io::Cursor;
 use serde::{Serialize, Deserialize};
+
+/// Captures one monitor's current contents.
+///
+/// On macOS this goes through ScreenCaptureKit (`macos_capture`) instead of xcap's built-in
+/// `Monitor::capture_image()`, which uses the deprecated `CGWindowListCreateImage` API. On
+/// modern macOS that legacy path can silently return the desktop wallpaper instead of real
+/// window content, and re-triggers the Screen Recording permission prompt on every launch
+/// regardless of a prior grant.
+fn capture_monitor_image(monitor: &Monitor, info: &DisplayInfo) -> Result<RgbaImage, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let display_id = monitor.id().map_err(|e| format!("Failed to read display id: {e}"))?;
+        let pixel_width = (info.width as f32 * info.scale_factor).round() as u32;
+        let pixel_height = (info.height as f32 * info.scale_factor).round() as u32;
+        macos_capture::capture_display(display_id, pixel_width, pixel_height)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        monitor.capture_image().map_err(|e| e.to_string())
+    }
+}
 
 /// Represents the individual captured screen dataset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,7 +91,7 @@ impl ScreenshotTool {
                 }
             });
 
-            match monitor.capture_image() {
+            match capture_monitor_image(monitor, &info) {
                 Ok(rgba_image) => {
                     let orig_width = rgba_image.width();
                     let orig_height = rgba_image.height();
