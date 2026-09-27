@@ -86,11 +86,11 @@ export class PaletteComponent {
         ></textarea>
 
         <div class="palette-badges">
-          <button class="voice-btn clear-btn" title="Clear conversation">${PALETTE_ICONS.clear}</button>
+          <button class="voice-btn mic-btn" title="Voice command">${PALETTE_ICONS.mic}</button>
           <button class="voice-btn audio-btn muted" title="Audio output: muted">${PALETTE_ICONS.audioOff}</button>
+          <button class="voice-btn clear-btn" title="Clear conversation">${PALETTE_ICONS.clear}</button>
           <button class="voice-btn logout-btn" title="Sign out">${PALETTE_ICONS.logout}</button>
           <button class="voice-btn hide-btn" title="Hide">${PALETTE_ICONS.hide}</button>
-          <button class="voice-btn mic-btn" title="Voice command">${PALETTE_ICONS.mic}</button>
           <button class="send-btn" title="Send">Send
             ${lineArrow}
           </button>

@@ -136,84 +136,77 @@ export class AudioManager {
     onDone?: () => void
   ): void {
     if (!this.isAudioEnabled) {
-      if (onStart) onStart();
-      if (onDone) onDone();
+      onStart?.();
+      onDone?.();
       return;
     }
 
-    if (this.elevenLabs.canSpeak()) {
-      void this.speakWithElevenLabs(text, onStart, onDone);
-      return;
-    }
-
-    this.speakWithBrowser(text, onStart, onDone);
+    void this.prepareSpeech(text, onDone).then((play) => {
+      onStart?.();
+      play();
+    });
   }
 
-  private async speakWithElevenLabs(
-    text: string,
-    onStart?: () => void,
-    onDone?: () => void
-  ): Promise<void> {
+  /**
+   * Synthesizes speech ahead of time (the ElevenLabs network round trip) and returns a
+   * function that starts playback instantly. Lets a caller line narration up with other
+   * output — e.g. visual tools dispatched from the same model response — so playback
+   * begins the moment everything is ready instead of lagging behind while the audio is
+   * still being fetched.
+   */
+  public async prepareSpeech(text: string, onDone?: () => void): Promise<() => void> {
+    if (!this.isAudioEnabled) {
+      return () => onDone?.();
+    }
+
+    if (!this.elevenLabs.canSpeak()) {
+      return () => this.speakWithBrowser(text, undefined, onDone);
+    }
+
     try {
       const audioBlob = await this.elevenLabs.synthesizeSpeech(text);
       if (!this.isAudioEnabled) {
-        onDone?.();
-        return;
+        return () => onDone?.();
       }
 
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
-      this.speechAudio = audio;
-      let finished = false;
+      audio.preload = "auto";
+
       const cleanup = () => {
-        if (finished) return;
-        finished = true;
         audio.onended = null;
         audio.onerror = null;
-        audio.onpause = null;
         URL.revokeObjectURL(audioUrl);
         if (this.speechAudio === audio) this.speechAudio = null;
       };
       const useBrowserFallback = () => {
-        if (finished) return;
         cleanup();
         if (this.isAudioEnabled) {
-          this.speakWithBrowser(text, onStart, onDone);
+          this.speakWithBrowser(text, undefined, onDone);
         } else {
           onDone?.();
         }
       };
 
-      audio.onplay = () => onStart?.();
-      audio.onended = () => {
-        cleanup();
-        this.playSound("agent_done");
-        onDone?.();
-      };
-      audio.onerror = () => {
-        console.warn("[AudioManager] ElevenLabs audio playback failed; using browser speech.");
-        useBrowserFallback();
-      };
-      audio.onpause = () => {
-        if (!this.isAudioEnabled) {
+      return () => {
+        this.speechAudio = audio;
+        audio.onended = () => {
           cleanup();
+          this.playSound("agent_done");
           onDone?.();
-        }
+        };
+        audio.onerror = () => {
+          console.warn("[AudioManager] Prepared ElevenLabs audio failed to play; using browser speech.");
+          useBrowserFallback();
+        };
+        audio.play().catch((err) => {
+          console.warn("[AudioManager] Prepared speech could not start; using browser speech:", err);
+          useBrowserFallback();
+        });
       };
-
-      try {
-        await audio.play();
-      } catch (err) {
-        console.warn("[AudioManager] ElevenLabs audio could not start; using browser speech:", err);
-        useBrowserFallback();
-      }
     } catch (err) {
-      console.warn("[AudioManager] ElevenLabs speech failed; using browser speech:", err);
-      if (this.isAudioEnabled) {
-        this.speakWithBrowser(text, onStart, onDone);
-      } else {
-        onDone?.();
-      }
+      console.warn("[AudioManager] Failed to prepare ElevenLabs speech; falling back to browser voice:", err);
+      return () => this.speakWithBrowser(text, undefined, onDone);
     }
   }
 

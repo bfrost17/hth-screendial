@@ -532,6 +532,20 @@ class ScreendialApp {
     }
 
     this.hideStatus("processing");
+
+    // Synthesize any narration up front (the slow, network-bound ElevenLabs step) so it's
+    // ready to go before anything renders. Otherwise the visuals land immediately while
+    // the audio is still being fetched, and the two land out of sync.
+    const voiceAction = actions.find(
+      (action) =>
+        action.tool === "voice" &&
+        typeof action.args.text === "string" &&
+        action.args.text.trim()
+    );
+    const playSpeech = voiceAction
+      ? await this.audio.prepareSpeech(voiceAction.args.text as string)
+      : null;
+
     this.audio.playSound("results_back");
 
     // Clear previous highlights to redraw freshly
@@ -543,8 +557,14 @@ class ScreendialApp {
         .map((action) => String(action.args.screen_id ?? "0"))
     );
 
-    // Polymorphically execute independent client tools
+    // Polymorphically execute independent client tools; the visuals and the
+    // now-ready narration all start in this same pass.
     for (const action of actions) {
+      if (action.tool === "voice") {
+        playSpeech?.();
+        continue;
+      }
+
       if (
         action.tool === "overlay" &&
         highlightedScreens.has(String(action.args.screen_id ?? "0"))
