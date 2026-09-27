@@ -1,7 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+import "./styles/fonts.css";
 import "./styles/glass.css";
+import "./styles/palette-vhs.css";
+import "./styles/brand.css";
+import "./styles/tape.css";
+import "./styles/overlay-vhs.css";
 import { PaletteComponent } from "./components/Palette";
 import { OverlayComponent } from "./components/Overlay";
 import { AuthModalComponent } from "./components/AuthModal";
@@ -466,6 +471,8 @@ class ScreendialApp {
       // 1. Capture ALL screens simultaneously
       const screens = await invoke<Record<string, ScreenCapturePayload>>("capture_all_screens_cmd");
       console.log(`[Screendial] Captured ${Object.keys(screens).length} screen(s) for processing`);
+      // Only now: the overlay is in the captures, so the viewfinder must not be
+      this.overlay.showScanning(audioBase64 ? "Reading screen + voice" : "Reading screen");
 
       // 2. Submit captures to Gemini Agent
       let modelResponse: string | undefined;
@@ -480,6 +487,7 @@ class ScreendialApp {
           modelResponse = response;
         }
       );
+      this.overlay.hideScanning();
       if (!modelResponse) {
         const voiceResponse = toolCalls.find(
           (toolCall) =>
@@ -510,6 +518,7 @@ class ScreendialApp {
       this.showStatus(`Error: ${err.message || err}`, false, "error", 4000);
       this.audio.speak("An error occurred while processing your request.");
     } finally {
+      this.overlay.hideScanning();
       this.hideStatus("processing");
       this.palette.setState("idle");
       this.updateInteractiveRegions();

@@ -541,7 +541,21 @@ pub fn run() {
             )?;
 
             let tray_tooltip = "Screendial (Active)";
-            let _tray = TrayIconBuilder::new()
+            let mut tray_builder = TrayIconBuilder::new();
+            // The S° logo in colour (icons/tray.png), with a thin dark rim so the yellow reads
+            // on light menu bars too. Not a template image: macOS would flatten a template to
+            // monochrome.
+            match image::load_from_memory(include_bytes!("../icons/tray.png")) {
+                Ok(img) => {
+                    let rgba = img.to_rgba8();
+                    let (w, h) = rgba.dimensions();
+                    tray_builder = tray_builder
+                        .icon(tauri::image::Image::new_owned(rgba.into_raw(), w, h))
+                        .icon_as_template(false);
+                }
+                Err(e) => eprintln!("[Screendial] tray icon unreadable, using the default: {}", e),
+            }
+            let _tray = tray_builder
                 .menu(&tray_menu)
                 .tooltip(tray_tooltip)
                 .on_menu_event(|app, event| {

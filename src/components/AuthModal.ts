@@ -1,5 +1,6 @@
 import { authService, AuthUserProfile } from "../services/auth0";
 import { logToTerminal } from "../services/terminalLog";
+import { lineArrow, logo } from "../brand/ui";
 
 export class AuthModalComponent {
   private container: HTMLElement;
@@ -31,14 +32,11 @@ export class AuthModalComponent {
 
   private render() {
     this.container.innerHTML = `
-      <div class="auth-card glass-panel">
+      <div class="auth-card">
+        <span class="vf-frame auth-frame" aria-hidden="true"></span>
         <div class="auth-header">
-          <div class="auth-brand-icon">
-            <svg viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2" fill="none"></circle>
-              <circle cx="12" cy="12" r="4" fill="white"></circle>
-            </svg>
-          </div>
+          <div class="auth-brand-icon">${logo(44)}</div>
+          <p class="auth-kicker"><span class="auth-kicker-dot" aria-hidden="true"></span><span class="auth-kicker-text">Sign in</span></p>
           <h2 class="auth-title">Screendial</h2>
           <p class="auth-subtitle">Sign in to activate your intelligent screen companion</p>
         </div>
@@ -49,10 +47,6 @@ export class AuthModalComponent {
           <div class="auth-input-group">
             <label class="auth-label" for="auth-email">Email Address</label>
             <div class="auth-input-wrapper">
-              <svg class="auth-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect width="20" height="16" x="2" y="4" rx="2"></rect>
-                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
-              </svg>
               <input 
                 type="email" 
                 id="auth-email" 
@@ -69,10 +63,6 @@ export class AuthModalComponent {
               <label class="auth-label" for="auth-password">Password</label>
             </div>
             <div class="auth-input-wrapper">
-              <svg class="auth-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
               <input 
                 type="password" 
                 id="auth-password" 
@@ -93,6 +83,7 @@ export class AuthModalComponent {
 
           <button type="submit" class="auth-btn auth-btn-primary" id="auth-submit-btn">
             <span class="auth-btn-text">Sign In</span>
+            <span class="auth-btn-arrow">${lineArrow}</span>
             <div class="spinner-iridescent auth-spinner" style="display: none;"></div>
           </button>
         </form>
@@ -128,11 +119,13 @@ export class AuthModalComponent {
       const subtitle = this.container.querySelector<HTMLElement>(".auth-subtitle")!;
       const submitText = this.container.querySelector<HTMLElement>(".auth-btn-text")!;
       const footerText = this.container.querySelector<HTMLElement>(".auth-footer-text")!;
+      const kickerText = this.container.querySelector<HTMLElement>(".auth-kicker-text")!;
       const errorBanner = this.container.querySelector<HTMLElement>("#auth-error")!;
       errorBanner.style.display = "none";
 
       if (this.isSignUp) {
         title.textContent = "Create Account";
+        kickerText.textContent = "New account";
         subtitle.textContent = "Create your Screendial account to get started";
         submitText.textContent = "Sign Up";
         footerText.textContent = "Already have an account?";
@@ -141,6 +134,7 @@ export class AuthModalComponent {
         passwordInput.setAttribute("autocomplete", "new-password");
       } else {
         title.textContent = "Screendial";
+        kickerText.textContent = "Sign in";
         subtitle.textContent = "Sign in to activate your intelligent screen companion";
         submitText.textContent = "Sign In";
         footerText.textContent = "Don't have an account?";
@@ -203,10 +197,12 @@ export class AuthModalComponent {
       submitBtn.disabled = true;
       btnText.textContent = label || (this.isSignUp ? "Signing Up..." : "Signing In...");
       spinner.style.display = "block";
+      submitBtn.classList.add("is-loading");
     } else {
       submitBtn.disabled = false;
       btnText.textContent = this.isSignUp ? "Sign Up" : "Sign In";
       spinner.style.display = "none";
+      submitBtn.classList.remove("is-loading");
     }
   }
 

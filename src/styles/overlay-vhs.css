@@ -1,0 +1,1070 @@
+/* ==========================================================================
+   Overlay surfaces in the dashboard's design language: guidance callouts, target
+   highlights, output widgets, the sign-in card, and the viewfinder shown while the agent
+   reads the screen. Loaded after glass.css and overrides its rules for these surfaces.
+
+   Same rules as the dashboard: ink plates with the tape's 3px scanlines, volt used
+   sparingly (labels, focus, the one primary action), Advent Pro everywhere, Blue Ocean
+   only at 20px and up, system mono for anything read character by character, and
+   transform/opacity-only motion over the live desktop.
+   ========================================================================== */
+
+:root {
+  --ink-0: #00111f;
+  --ink-1: #001a2b;
+  --volt: #efff00;
+  --volt-dim: rgba(239, 255, 0, 0.34);
+  --rec: #ff2e3f;
+  --fg: #e9edf2;
+  --fg-dim: rgba(233, 237, 242, 0.72);
+  --fg-faint: rgba(233, 237, 242, 0.5);
+  --rule: rgba(233, 237, 242, 0.09);
+  --rule-strong: rgba(233, 237, 242, 0.2);
+
+  --f-display: "Blue Ocean", "Iowan Old Style", Georgia, serif;
+  --f-text: "Advent Pro", "Helvetica Neue", Arial, sans-serif;
+  --f-code: ui-monospace, "SF Mono", Menlo, monospace;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.1, 1);
+
+  /* the tape's scanlines over an ink plate */
+  --plate:
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 3px),
+    rgba(0, 14, 26, 0.94);
+  --plate-shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.75);
+  /* the OSD's chroma split */
+  --chroma: 1.5px 0 rgba(255, 30, 120, 0.55), -1.5px 0 rgba(0, 190, 255, 0.55);
+  /* The dashboard only ever draws its marks over its own dark picture; over a live desktop
+     they can land on white. A tight ink keyline under them holds them off any background. */
+  --keyline: drop-shadow(0 0 1px rgba(0, 8, 18, 0.95)) drop-shadow(0 0 2px rgba(0, 8, 18, 0.55));
+
+  color-scheme: dark;
+}
+
+::selection {
+  background: var(--volt);
+  color: var(--ink-0);
+}
+
+/* --------------------------------------------------------------------------
+   Viewfinder: corner brackets + tape-deck readouts (the dashboard's .vf)
+   -------------------------------------------------------------------------- */
+
+.vf-frame {
+  --c: rgba(255, 255, 255, 0.92);
+  --a: var(--vf-arm, 56px);
+  --w: var(--vf-line, 2px);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--a) var(--w),
+    linear-gradient(var(--c), var(--c)) top left / var(--w) var(--a),
+    linear-gradient(var(--c), var(--c)) top right / var(--a) var(--w),
+    linear-gradient(var(--c), var(--c)) top right / var(--w) var(--a),
+    linear-gradient(var(--c), var(--c)) bottom left / var(--a) var(--w),
+    linear-gradient(var(--c), var(--c)) bottom left / var(--w) var(--a),
+    linear-gradient(var(--c), var(--c)) bottom right / var(--a) var(--w),
+    linear-gradient(var(--c), var(--c)) bottom right / var(--w) var(--a);
+  background-repeat: no-repeat;
+  filter: var(--keyline) drop-shadow(1px 0 rgba(255, 30, 120, 0.5)) drop-shadow(-1px 0 rgba(0, 190, 255, 0.5));
+}
+
+/* Reading the screen: one frame per monitor, like looking through the camcorder */
+.scan-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4000;
+}
+
+.vf--scan {
+  --vf-arm: clamp(48px, 7vw, 120px);
+  --vf-pad-x: 26px;
+  --vf-pad-y: 22px;
+  position: absolute;
+  pointer-events: none;
+  font-family: var(--f-text);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: var(--chroma), 0 0 1px rgba(0, 8, 18, 0.95), 0 0 3px rgba(0, 8, 18, 0.8), 0 1px 6px rgba(0, 5, 14, 0.6);
+}
+
+.vf--scan > .vf-frame {
+  inset: 12px;
+  animation: vf-lock 0.9s var(--ease-out) both;
+}
+
+.vf-label {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  white-space: nowrap;
+  animation: vf-label-in 0.45s steps(3) 0.5s both;
+}
+
+.vf-tl { top: var(--vf-pad-y); left: var(--vf-pad-x); }
+.vf-tr { top: var(--vf-pad-y); right: var(--vf-pad-x); }
+.vf-bl { bottom: var(--vf-pad-y); left: var(--vf-pad-x); }
+.vf-br { bottom: var(--vf-pad-y); right: var(--vf-pad-x); }
+
+.vf-tr,
+.vf-br {
+  gap: 0;
+  letter-spacing: 0;
+}
+
+.vf-bl .vf-state {
+  color: var(--volt);
+  letter-spacing: 0.14em;
+  font-size: 0.8em;
+}
+
+.vf-bl .vf-state::after {
+  content: "";
+  display: inline-block;
+  width: 0.42em;
+  height: 0.42em;
+  margin-left: 0.55em;
+  vertical-align: 0.12em;
+  background: var(--volt);
+  animation: pv-blink 0.6s steps(1) infinite;
+}
+
+.vf-rec-dot {
+  width: 0.46em;
+  height: 0.46em;
+  border-radius: 50%;
+  background: var(--rec);
+  box-shadow: 0 0 0.4em rgba(255, 46, 63, 0.8);
+  animation: osd-blink 1.4s steps(1) infinite;
+}
+
+/* Advent Pro has no tabular figures: one fixed cell per digit keeps the counter still */
+.tc-d {
+  display: inline-block;
+  width: 0.5em;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.tc-sep {
+  margin: 0 0.07em;
+}
+
+/* --------------------------------------------------------------------------
+   Target highlight: the viewfinder's focus lock, in volt. Four brackets fly in from
+   outside the target, overshoot, and settle; the rule and tint fade up behind them, a
+   scan line crosses once, then the brackets keep hunting gently, like autofocus. A pixel
+   arrow (the Send arrow) slides in beside the target and nudges toward it.
+   -------------------------------------------------------------------------- */
+
+.highlight-box {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  animation: none;
+}
+
+/* the thin rule and tint between the brackets */
+.highlight-box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--volt-dim);
+  background: rgba(239, 255, 0, 0.05);
+  opacity: 0;
+  pointer-events: none;
+  animation: hl-fill 0.6s var(--ease-out) 0.3s both;
+}
+
+/* one scan down the target once the frame has locked */
+.highlight-box::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(239, 255, 0, 0.8), transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: hl-scan 1.3s var(--ease-out) 0.55s 1;
+}
+
+.hl-corner {
+  --arm: min(26px, 34%);
+  --reach: 18px; /* how far outside the target each bracket starts */
+  position: absolute;
+  width: var(--arm);
+  height: min(26px, 34%);
+  min-width: 8px;
+  min-height: 8px;
+  border: 0 solid var(--volt);
+  pointer-events: none;
+  filter: var(--keyline) drop-shadow(1px 0 rgba(255, 30, 120, 0.55)) drop-shadow(-1px 0 rgba(0, 190, 255, 0.55)) drop-shadow(0 0 8px rgba(239, 255, 0, 0.45));
+  animation:
+    hl-form 0.75s var(--ease-out) both,
+    hl-hunt 2.8s ease-in-out 1.1s infinite;
+}
+
+.hl-tl { top: -3px; left: -3px; border-top-width: 2px; border-left-width: 2px; --x: -1; --y: -1; }
+.hl-tr { top: -3px; right: -3px; border-top-width: 2px; border-right-width: 2px; --x: 1; --y: -1; animation-delay: 0.04s, 1.14s; }
+.hl-bl { bottom: -3px; left: -3px; border-bottom-width: 2px; border-left-width: 2px; --x: -1; --y: 1; animation-delay: 0.08s, 1.18s; }
+.hl-br { bottom: -3px; right: -3px; border-bottom-width: 2px; border-right-width: 2px; --x: 1; --y: 1; animation-delay: 0.12s, 1.22s; }
+
+/* in from outside, a hair past the corner, back out, settle */
+@keyframes hl-form {
+  0% {
+    opacity: 0;
+    transform: translate(calc(var(--x) * var(--reach)), calc(var(--y) * var(--reach))) scale(0.4);
+  }
+  35% { opacity: 1; }
+  62% { transform: translate(calc(var(--x) * -3px), calc(var(--y) * -3px)) scale(1.04); }
+  82% { transform: translate(calc(var(--x) * 1px), calc(var(--y) * 1px)); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* autofocus hunting: an inward breath every few seconds */
+@keyframes hl-hunt {
+  0%, 70%, 100% { transform: none; }
+  80% { transform: translate(calc(var(--x) * -2px), calc(var(--y) * -2px)); }
+  88% { transform: translate(calc(var(--x) * 1px), calc(var(--y) * 1px)); }
+}
+
+@keyframes hl-fill {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes hl-scan {
+  0% { opacity: 0; transform: translateY(0); }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(calc(var(--hl-h, 100%) - 2px)); }
+}
+
+.hl-arrow {
+  position: absolute;
+  z-index: 5001;
+  width: 36px;
+  height: 16px;
+  color: var(--volt);
+  pointer-events: none;
+  filter: var(--keyline) drop-shadow(1px 0 rgba(255, 30, 120, 0.55)) drop-shadow(-1px 0 rgba(0, 190, 255, 0.55)) drop-shadow(0 0 8px rgba(239, 255, 0, 0.45));
+  --dir: 1; /* +1 points right (arrow left of the target), -1 points left */
+  animation:
+    hl-arrow-in 0.5s var(--ease-out) 0.3s both,
+    hl-nudge 1.4s ease-in-out 0.9s infinite;
+}
+
+.hl-arrow--right {
+  --dir: -1;
+}
+
+.hl-arrow--right .hl-arrow-art {
+  transform: scaleX(-1);
+}
+
+.hl-arrow-art {
+  display: block;
+}
+
+@keyframes hl-arrow-in {
+  from { opacity: 0; transform: translateX(calc(var(--dir) * -16px)); }
+  to { opacity: 1; transform: none; }
+}
+
+/* a small push toward the target, like the Send arrow on hover */
+@keyframes hl-nudge {
+  0%, 100% { transform: none; }
+  50% { transform: translateX(calc(var(--dir) * 6px)); }
+}
+
+/* --------------------------------------------------------------------------
+   Guidance callouts + output widgets: the navbar's UI as a panel. The same picture
+   (tape + waves) on a clipped, rounded, see-through layer, a denser scrim for
+   paragraphs, a hairline edge, and the bar's dark-disc controls.
+   -------------------------------------------------------------------------- */
+
+.callout-bubble,
+.widget-card.glass-panel {
+  --bar-radius: 22px;
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  border-radius: var(--bar-radius);
+  background: rgba(0, 16, 30, 0.22);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.6);
+  color: var(--fg);
+  font-family: var(--f-text);
+  font-weight: 500;
+}
+
+.callout-bubble {
+  position: fixed; /* placed and dragged by Overlay.ts */
+  padding: 14px 16px 16px;
+  animation: plate-in 0.5s var(--ease-out) both;
+}
+
+.widget-card.glass-panel {
+  padding: 16px 18px 18px;
+  gap: 14px;
+  animation: plate-in 0.5s var(--ease-out) both;
+}
+
+/* the panel's contents sit over the picture and its scrim */
+.callout-bubble > :not(.bar-picture),
+.widget-card.glass-panel > :not(.bar-picture) {
+  position: relative;
+  z-index: 2;
+}
+
+/* hairline edge, as on the bar; volt while dragging */
+.callout-bubble::after,
+.widget-card.glass-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(233, 237, 242, 0.14);
+  pointer-events: none;
+  transition: box-shadow 0.2s;
+}
+
+.callout-bubble:hover::after,
+.widget-card.glass-panel:hover::after {
+  box-shadow: inset 0 0 0 1px rgba(233, 237, 242, 0.24);
+}
+
+.callout-bubble.dragging::after,
+.output-widget-container.dragging .widget-card::after {
+  box-shadow: inset 0 0 0 1px var(--volt-dim);
+}
+
+.widget-card.glass-panel:hover {
+  border-color: transparent;
+}
+
+/* Denser than the bar's scrim: the bar holds one line, a panel holds paragraphs. The
+   header band stays the most open, so the picture still reads. */
+.panel-scrim {
+  background:
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, rgba(0, 10, 22, 0.5) 0, rgba(0, 10, 22, 0.72) 56px, rgba(0, 10, 22, 0.78) 100%);
+}
+
+/* over a moving picture: lift the copy off it, as the bar's input does */
+.callout-bubble,
+.widget-card.glass-panel {
+  text-shadow: 0 1px 3px rgba(0, 5, 14, 0.85);
+}
+
+@keyframes plate-in {
+  0% { opacity: 0; transform: translateY(10px); }
+  45% { opacity: 1; }
+  52% { opacity: 0.55; }
+  58% { opacity: 1; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+
+.callout-header {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.callout-drag-handle,
+.widget-drag-area {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  cursor: grab;
+}
+
+.callout-bubble.dragging .callout-drag-handle,
+.output-widget-container.dragging .widget-drag-area {
+  cursor: grabbing;
+}
+
+.drag-grip {
+  flex: none;
+  color: var(--fg-faint);
+  transition: color 0.2s;
+}
+
+.callout-drag-handle:hover .drag-grip,
+.widget-drag-area:hover .drag-grip,
+.callout-bubble.dragging .drag-grip,
+.output-widget-container.dragging .drag-grip {
+  color: var(--volt);
+}
+
+.callout-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--volt);
+}
+
+/* tape-deck readout */
+.callout-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--f-text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--volt);
+}
+
+/* widget headline: the dashboard's section heading */
+.widget-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.widget-title-text {
+  min-width: 0;
+  font-family: var(--f-display);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--volt);
+  overflow-wrap: anywhere;
+}
+
+.callout-header-actions {
+  flex: none;
+  gap: 6px;
+}
+
+/* the bar's dark-disc controls: a pill for Copy, a disc for close */
+.callout-action-btn {
+  height: 28px;
+  padding: 0 12px 0 10px;
+  gap: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 10, 22, 0.55);
+  color: var(--fg-dim);
+  text-shadow: none;
+  font-family: var(--f-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.callout-action-btn:hover {
+  background: rgba(24, 38, 54, 0.9);
+  color: var(--fg);
+}
+
+.callout-action-btn.copied {
+  background: var(--volt);
+  color: var(--ink-0);
+}
+
+.callout-close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 10, 22, 0.55);
+  color: var(--fg-dim);
+  transition: color 0.2s, background 0.2s;
+}
+
+.callout-close:hover {
+  transform: none;
+  border-color: transparent;
+  background: var(--rec);
+  color: #fff;
+}
+
+/* body copy: the agent's turn in the dashboard transcript (volt rule on the left) */
+.callout-text {
+  padding: 0 6px 0 12px;
+  border-left: 1px solid var(--volt);
+  font-family: var(--f-text);
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: rgba(233, 237, 242, 0.9);
+}
+
+.callout-text strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.callout-text em {
+  /* Advent Pro has no italic; lean on colour instead of a faked oblique */
+  font-style: normal;
+  color: #ffe6f2;
+}
+
+.callout-text a {
+  color: var(--volt);
+  text-underline-offset: 3px;
+}
+
+.callout-text h1,
+.callout-text h2,
+.callout-text h3,
+.callout-text h4 {
+  margin: 10px 0 6px;
+  font-family: var(--f-text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--volt);
+}
+
+.callout-text ul,
+.callout-text ol {
+  margin: 6px 0 8px 18px;
+}
+
+.callout-text li::marker {
+  color: var(--volt);
+}
+
+.callout-text code,
+.inline-code {
+  padding: 1px 7px;
+  border: 1px solid var(--volt-dim);
+  border-radius: 999px;
+  background: none;
+  color: var(--volt);
+  font-family: var(--f-code);
+  font-size: 0.8em;
+}
+
+.callout-text pre,
+.widget-code {
+  margin: 8px 0;
+  padding: 12px 14px;
+  border: 0;
+  border-left: 1px solid var(--volt);
+  border-radius: 4px 12px 12px 4px;
+  background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px), rgba(0, 8, 18, 0.78);
+  text-shadow: none;
+  font-family: var(--f-code);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--fg-dim);
+  overflow-x: auto;
+  white-space: pre;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text;
+}
+
+/* inside a callout the text already runs on a volt rule: don't double it */
+.callout-text pre {
+  border-left-color: var(--rule-strong);
+}
+
+.callout-text pre code,
+.widget-code code {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+.callout-text blockquote {
+  border-left: 1px solid var(--rule-strong);
+  padding-left: 10px;
+  color: var(--fg-dim);
+}
+
+.callout-text hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 10px 0;
+}
+
+/* scrollbars: the dashboard's thin volt thumb */
+.callout-text,
+.widget-card,
+.widget-code {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(239, 255, 0, 0.25) transparent;
+}
+
+.callout-text::-webkit-scrollbar-track,
+.widget-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.callout-text::-webkit-scrollbar-thumb,
+.widget-card::-webkit-scrollbar-thumb {
+  background: rgba(239, 255, 0, 0.25);
+  border-radius: 0;
+}
+
+.callout-text::-webkit-scrollbar-thumb:hover,
+.widget-card::-webkit-scrollbar-thumb:hover {
+  background: rgba(239, 255, 0, 0.5);
+}
+
+/* checklist */
+.checklist-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.checklist-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.checklist-item:last-child {
+  border-bottom: 0;
+}
+
+.checklist-item p {
+  margin: 0;
+}
+
+.checklist-item input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  border: 1px solid rgba(233, 237, 242, 0.4);
+  border-radius: 5px;
+  background: rgba(0, 10, 22, 0.55);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.checklist-item:hover input[type="checkbox"] {
+  border-color: var(--volt);
+}
+
+.checklist-item input[type="checkbox"]::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  margin-top: -2px;
+  border-left: 2px solid var(--ink-0);
+  border-bottom: 2px solid var(--ink-0);
+  transform: rotate(-45deg);
+  opacity: 0;
+}
+
+.checklist-item input[type="checkbox"]:checked {
+  border-color: var(--volt);
+  background: var(--volt);
+}
+
+.checklist-item input[type="checkbox"]:checked::after {
+  opacity: 1;
+}
+
+.checklist-item input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--volt);
+  outline-offset: 3px;
+}
+
+.checklist-item:has(input:checked) > span {
+  color: var(--fg-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--volt-dim);
+}
+
+.checklist-item code {
+  padding: 1px 7px;
+  border: 1px solid var(--volt-dim);
+  border-radius: 999px;
+  color: var(--volt);
+  font-family: var(--f-code);
+  font-size: 0.8em;
+}
+
+/* action buttons: the dashboard's ghost pill */
+.widget-actions {
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* the bar's Send pill: solid volt, the panel's one primary action */
+.action-chip-btn {
+  height: 34px;
+  padding: 0 14px 0 16px;
+  gap: 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--volt);
+  color: var(--ink-0);
+  text-shadow: none;
+  font-family: var(--f-text);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s, color 0.2s, box-shadow 0.25s;
+}
+
+.action-chip-btn:hover {
+  border-color: transparent;
+  background: var(--volt);
+  color: var(--ink-0);
+  box-shadow: 0 0 26px rgba(239, 255, 0, 0.35);
+}
+
+.action-chip-btn kbd,
+kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: none;
+  font-family: var(--f-text);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+}
+
+/* --------------------------------------------------------------------------
+   Sign-in: an ink card in viewfinder brackets over a scanlined, dimmed desktop
+   -------------------------------------------------------------------------- */
+
+.auth-overlay {
+  background:
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 45%, rgba(0, 17, 31, 0.55) 30%, rgba(0, 5, 14, 0.85) 100%);
+  backdrop-filter: blur(14px) saturate(110%);
+  -webkit-backdrop-filter: blur(14px) saturate(110%);
+  font-family: var(--f-text);
+  visibility: hidden; /* out of hit-testing and compositing (incl. the blur) while closed */
+  transition: opacity 0.3s var(--ease-out), visibility 0s linear 0.3s;
+}
+
+.auth-overlay.visible {
+  visibility: visible;
+  transition: opacity 0.3s var(--ease-out), visibility 0s;
+}
+
+.auth-card {
+  position: relative;
+  isolation: isolate;
+  width: 420px;
+  padding: 44px 40px 34px;
+  gap: 24px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: var(--plate);
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.85);
+  transform: translateY(12px);
+  transition: transform 0.45s var(--ease-out);
+}
+
+.auth-overlay.visible .auth-card {
+  transform: none;
+}
+
+.auth-frame {
+  --vf-arm: 34px;
+  --vf-line: 1.5px;
+  --c: rgba(255, 255, 255, 0.7);
+  inset: 12px;
+  z-index: -1;
+}
+
+.auth-overlay.visible .auth-frame {
+  animation: vf-lock 0.9s var(--ease-out) both;
+}
+
+.auth-header {
+  align-items: flex-start;
+  text-align: left;
+  gap: 10px;
+}
+
+.auth-brand-icon,
+.auth-brand-icon.auth-brand-icon {
+  width: auto;
+  height: auto;
+  margin: 0 0 6px;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.auth-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--volt);
+}
+
+.auth-kicker-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rec);
+  box-shadow: 0 0 8px rgba(255, 46, 63, 0.8);
+  animation: osd-blink 1.4s steps(1) infinite;
+}
+
+.auth-title {
+  font-family: var(--f-display);
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--volt);
+}
+
+.auth-subtitle {
+  max-width: 300px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+}
+
+.auth-error-banner {
+  padding: 2px 0 2px 12px;
+  border: 0;
+  border-left: 1px solid #ff4d5e;
+  border-radius: 0;
+  background: none;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #ffb8bf;
+  animation: plate-in 0.4s var(--ease-out) both;
+}
+
+.auth-form {
+  gap: 20px;
+}
+
+.auth-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+.auth-input-group:focus-within .auth-label {
+  color: var(--volt);
+}
+
+/* the dashboard's underline field */
+.auth-input-wrapper {
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.auth-input-wrapper:focus-within {
+  border-color: var(--volt);
+  background: transparent;
+  box-shadow: 0 1px 0 var(--volt);
+}
+
+.auth-input {
+  padding: 9px 34px 9px 0;
+  font-family: var(--f-text);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--fg);
+  caret-color: var(--volt);
+}
+
+.auth-input::placeholder {
+  color: var(--fg-faint);
+}
+
+.auth-password-toggle {
+  right: 0;
+  color: var(--fg-dim);
+}
+
+.auth-password-toggle:hover {
+  color: var(--volt);
+}
+
+/* primary: the volt Send pill */
+.auth-btn {
+  height: 44px;
+  padding: 0 18px 0 22px;
+  border-radius: 999px;
+  font-family: var(--f-text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.auth-btn-primary {
+  margin-top: 6px;
+  border: 0;
+  background: var(--volt);
+  color: var(--ink-0);
+  box-shadow: none;
+  transition: box-shadow 0.25s, opacity 0.2s;
+}
+
+.auth-btn-primary:hover:not(:disabled) {
+  transform: none;
+  filter: none;
+  box-shadow: 0 0 26px rgba(239, 255, 0, 0.35);
+}
+
+.auth-btn-primary:disabled {
+  opacity: 0.55;
+}
+
+.auth-btn-arrow {
+  display: inline-flex;
+}
+
+.auth-btn-arrow .line-arrow {
+  transition: transform 0.35s var(--ease-out);
+}
+
+.auth-btn-primary:hover:not(:disabled) .line-arrow {
+  transform: translateX(5px);
+}
+
+.auth-btn-primary.is-loading .auth-btn-arrow {
+  display: none;
+}
+
+/* working: the palette's blinking block instead of a spinner */
+.auth-btn .auth-spinner {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink-0);
+  animation: pv-blink 0.6s steps(1) infinite;
+}
+
+.auth-footer {
+  justify-content: flex-start;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+  font-size: 14px;
+  color: var(--fg-dim);
+}
+
+/* the dashboard's text button */
+.auth-toggle-mode {
+  padding: 4px 0;
+  font-family: var(--f-text);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--volt);
+}
+
+.auth-toggle-mode:hover {
+  color: var(--volt);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+
+.auth-card :focus-visible {
+  outline: 1px solid var(--volt);
+  outline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   Keyframes (the dashboard's)
+   -------------------------------------------------------------------------- */
+
+@keyframes vf-lock {
+  0% { opacity: 0; transform: scale(1.07); }
+  25% { opacity: 1; }
+  45% { transform: scale(0.975); }
+  70% { transform: scale(1.01); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes vf-label-in {
+  0% { opacity: 0; }
+  34% { opacity: 1; }
+  67% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+@keyframes osd-blink {
+  0%, 62% { opacity: 1; }
+  63%, 100% { opacity: 0.15; }
+}
+
+@keyframes pv-blink {
+  0%, 60% { opacity: 1; }
+  61%, 100% { opacity: 0.2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vf--scan *,
+  .highlight-box::before,
+  .hl-corner,
+  .hl-arrow,
+  .callout-bubble,
+  .widget-card,
+  .auth-overlay * {
+    animation: none !important;
+  }
+
+  .highlight-box::after {
+    display: none;
+  }
+
+  .highlight-box::before {
+    opacity: 1;
+  }
+}

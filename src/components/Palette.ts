@@ -1,3 +1,17 @@
+import { lineArrow, logo } from "../brand/ui";
+import { pixelIcon } from "../brand/pixel-icons";
+import { BarPicture, mountBarPicture } from "../brand/bar-picture";
+
+/** Pixel toolbar icons (brand/pixel-icons.ts). */
+const PALETTE_ICONS = {
+  clear: pixelIcon("trash"),
+  audioOff: pixelIcon("sound-off"),
+  audioOn: pixelIcon("sound-on"),
+  logout: pixelIcon("logout"),
+  hide: pixelIcon("hide"),
+  mic: pixelIcon("mic"),
+};
+
 export class PaletteComponent {
   private container: HTMLElement;
   private paletteBox!: HTMLElement;
@@ -11,6 +25,9 @@ export class PaletteComponent {
   private brandIcon!: HTMLElement;
   private isVisible: boolean = false;
   private hasBeenMoved: boolean = false;
+  // the tape + waves behind the bar; runs only while the palette is open
+  private picture!: BarPicture;
+  private pictureOff = 0;
 
   private onSubmit: (query: string) => void;
   private onToggleVoice: () => void;
@@ -55,75 +72,32 @@ export class PaletteComponent {
       <div class="status-pill-container"></div>
 
       <div class="palette-box">
-        <div class="palette-drag-handle" title="Click & drag to reposition Screendial">
-          <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
-            <circle cx="2" cy="3" r="1.5"></circle>
-            <circle cx="8" cy="3" r="1.5"></circle>
-            <circle cx="2" cy="8" r="1.5"></circle>
-            <circle cx="8" cy="8" r="1.5"></circle>
-            <circle cx="2" cy="13" r="1.5"></circle>
-            <circle cx="8" cy="13" r="1.5"></circle>
+        <span class="bar-picture" aria-hidden="true"><span class="bar-scrim"></span></span>
+        <div class="palette-drag-handle" title="Drag to move">
+          <svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
+            <circle cx="2" cy="2" r="1.2"></circle><circle cx="6" cy="2" r="1.2"></circle>
+            <circle cx="2" cy="7" r="1.2"></circle><circle cx="6" cy="7" r="1.2"></circle>
+            <circle cx="2" cy="12" r="1.2"></circle><circle cx="6" cy="12" r="1.2"></circle>
           </svg>
         </div>
 
-        <div class="palette-icon-brand status-idle" title="Screendial Assistant">
-          <svg viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2" fill="none"></circle>
-            <circle cx="12" cy="12" r="4" fill="white"></circle>
-          </svg>
-        </div>
-        
-        <textarea 
-          class="palette-input" 
-          placeholder="Ask Screendial for anything on your screen" 
+        <div class="palette-icon-brand status-idle" title="Screendial">${logo(28)}</div>
+
+        <textarea
+          class="palette-input"
+          placeholder="Ask Screendial for anything on your screen"
           rows="1"
           spellcheck="false"
         ></textarea>
 
         <div class="palette-badges">
-          <button class="voice-btn send-btn" title="Send Query">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
-
-          <button class="voice-btn clear-btn" title="Clear Conversation History">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
-
-          <button class="voice-btn" title="Toggle Voice Command">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              <line x1="12" y1="19" x2="12" y2="23"></line>
-              <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>
-          </button>
-
-          <button class="voice-btn audio-btn muted" title="Audio Output: Muted (Click to turn on)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-              <line x1="23" y1="9" x2="17" y2="15"></line>
-              <line x1="17" y1="9" x2="23" y2="15"></line>
-            </svg>
-          </button>
-
-          <button class="voice-btn logout-btn" title="Sign Out">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-          </button>
-
-          <button class="voice-btn hide-btn" title="Hide / Minimize Window">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
+          <button class="voice-btn clear-btn" title="Clear conversation">${PALETTE_ICONS.clear}</button>
+          <button class="voice-btn audio-btn muted" title="Audio output: muted">${PALETTE_ICONS.audioOff}</button>
+          <button class="voice-btn logout-btn" title="Sign out">${PALETTE_ICONS.logout}</button>
+          <button class="voice-btn hide-btn" title="Hide">${PALETTE_ICONS.hide}</button>
+          <button class="voice-btn mic-btn" title="Voice command">${PALETTE_ICONS.mic}</button>
+          <button class="send-btn" title="Send">Send
+            ${lineArrow}
           </button>
         </div>
       </div>
@@ -136,9 +110,8 @@ export class PaletteComponent {
     this.sendButton = this.container.querySelector(".send-btn")!;
     this.clearButton = this.container.querySelector(".clear-btn")!;
     this.audioButton = this.container.querySelector(".audio-btn")!;
-    this.voiceButton = this.container.querySelector(
-      ".voice-btn:not(.clear-btn):not(.send-btn):not(.audio-btn):not(.hide-btn):not(.logout-btn)"
-    )!;
+    this.voiceButton = this.container.querySelector(".mic-btn")!;
+    this.picture = mountBarPicture(this.container.querySelector(".bar-picture")!, { active: false });
   }
 
   public showStatus(
@@ -370,26 +343,9 @@ export class PaletteComponent {
 
   public setAudioOutputEnabled(enabled: boolean) {
     if (!this.audioButton) return;
-    if (enabled) {
-      this.audioButton.className = "voice-btn audio-btn active";
-      this.audioButton.title = "Audio Output: On (Click to mute)";
-      this.audioButton.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-        </svg>
-      `;
-    } else {
-      this.audioButton.className = "voice-btn audio-btn muted";
-      this.audioButton.title = "Audio Output: Muted (Click to turn on)";
-      this.audioButton.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-          <line x1="23" y1="9" x2="17" y2="15"></line>
-          <line x1="17" y1="9" x2="23" y2="15"></line>
-        </svg>
-      `;
-    }
+    this.audioButton.className = `voice-btn audio-btn ${enabled ? "active" : "muted"}`;
+    this.audioButton.title = enabled ? "Audio output: on" : "Audio output: muted";
+    this.audioButton.innerHTML = enabled ? PALETTE_ICONS.audioOn : PALETTE_ICONS.audioOff;
   }
 
   public show(_activeApp: string = "Desktop", _screenName?: string) {
@@ -401,6 +357,8 @@ export class PaletteComponent {
       this.container.style.top = "96px";
       this.container.style.transform = "translateX(-50%)";
     }
+    window.clearTimeout(this.pictureOff);
+    this.picture.setActive(true);
     this.paletteBox.classList.add("visible");
     setTimeout(() => {
       this.inputElement.focus();
@@ -419,6 +377,9 @@ export class PaletteComponent {
     if (this.isVisible) {
       this.isVisible = false;
       this.paletteBox.classList.remove("visible");
+      // stop the picture once the fade-out (0.4s) has finished, not mid-fade
+      window.clearTimeout(this.pictureOff);
+      this.pictureOff = window.setTimeout(() => this.picture.setActive(false), 450);
       this.inputElement.blur();
       if (this.onClose) {
         this.onClose();

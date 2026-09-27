@@ -1,8 +1,12 @@
 import { marked } from "marked";
 import { HighlightElementArgs, ShowOutputWidgetArgs } from "../tools/types";
+import { pointerArrow, startTimecode } from "../brand/ui";
+import { BarPicture, mountBarPicture } from "../brand/bar-picture";
 
 const COPY_ICON_SVG = `<svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-const CHECK_ICON_SVG = `<svg class="check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+const CHECK_ICON_SVG = `<svg class="check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+const CLOSE_ICON_SVG = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"></path></svg>`;
+const DRAG_GRIP_SVG = `<svg class="drag-grip" width="8" height="14" viewBox="0 0 8 14" fill="currentColor"><circle cx="2" cy="2" r="1.2"></circle><circle cx="6" cy="2" r="1.2"></circle><circle cx="2" cy="7" r="1.2"></circle><circle cx="6" cy="7" r="1.2"></circle><circle cx="2" cy="12" r="1.2"></circle><circle cx="6" cy="12" r="1.2"></circle></svg>`;
 
 function renderMarkdown(content: string): string {
   try {
@@ -20,7 +24,7 @@ function setupCopyButton(btn: HTMLElement, textProvider: () => string) {
       const text = textProvider();
       await navigator.clipboard.writeText(text);
       btn.classList.add("copied");
-      btn.innerHTML = `${CHECK_ICON_SVG}<span class="copy-label" style="color: #34d399;">Copied!</span>`;
+      btn.innerHTML = `${CHECK_ICON_SVG}<span class="copy-label">Copied</span>`;
       setTimeout(() => {
         btn.classList.remove("copied");
         btn.innerHTML = `${COPY_ICON_SVG}<span class="copy-label">Copy</span>`;
@@ -33,8 +37,12 @@ function setupCopyButton(btn: HTMLElement, textProvider: () => string) {
 
 export class OverlayComponent {
   private container: HTMLElement;
+  private scanContainer: HTMLElement;
   private highlightsContainer: HTMLElement;
   private widgetsContainer: HTMLElement;
+  private stopScanClocks: Array<() => void> = [];
+  /** The navbar's picture behind each output panel; torn down with the panels. */
+  private panelPictures: BarPicture[] = [];
   private onDismissAndReset?: () => void;
   private desktopLayout: any = null;
 
@@ -45,12 +53,17 @@ export class OverlayComponent {
     this.container.id = "screendial-overlay-layer";
     this.container.style.cssText = "position: absolute; inset: 0; pointer-events: none;";
 
+    // Viewfinder shown while the model reads the screens; outside clear()'s reach
+    this.scanContainer = document.createElement("div");
+    this.scanContainer.className = "scan-layer";
+
     this.highlightsContainer = document.createElement("div");
     this.highlightsContainer.style.cssText = "position: absolute; inset: 0; pointer-events: none;";
 
     this.widgetsContainer = document.createElement("div");
     this.widgetsContainer.className = "output-widget-container interactive";
 
+    this.container.appendChild(this.scanContainer);
     this.container.appendChild(this.highlightsContainer);
     this.container.appendChild(this.widgetsContainer);
   }
@@ -80,12 +93,72 @@ export class OverlayComponent {
   }
 
   public clear() {
+    this.panelPictures.forEach((picture) => picture.destroy());
+    this.panelPictures = [];
     this.highlightsContainer.innerHTML = "";
     this.widgetsContainer.innerHTML = "";
   }
 
+  /**
+   * Puts the navbar's picture (tape + waves + scrim) behind a panel, on its own clipped
+   * layer. Calmer than the bar: panels carry paragraphs, not one line.
+   */
+  private mountPanelPicture(panel: HTMLElement) {
+    const layer = document.createElement("span");
+    layer.className = "bar-picture panel-picture";
+    layer.setAttribute("aria-hidden", "true");
+    layer.innerHTML = `<span class="bar-scrim panel-scrim"></span>`;
+    panel.prepend(layer);
+    this.panelPictures.push(
+      mountBarPicture(layer, {
+        intensity: 0.26,
+        wavesStrength: 0.6,
+        waves: { speed: 1.8, zoom: 0.5, pointer: { pan: 120, tilt: 12, ease: 0.07 } },
+      })
+    );
+  }
+
   public setLayout(layout: any) {
     this.desktopLayout = layout;
+  }
+
+  /**
+   * Camcorder viewfinder over every monitor while the model reads the screens: corner
+   * brackets, a REC light, the screen's name, what the agent is doing and a tape counter.
+   * Call after the capture: this window is in the screenshots.
+   */
+  public showScanning(stateText: string = "Reading screen") {
+    this.hideScanning();
+
+    const layout = this.desktopLayout;
+    const monitors: any[] = layout?.monitors?.length
+      ? layout.monitors
+      : [{ id: 0, logical_x: 0, logical_y: 0, logical_width: window.innerWidth, logical_height: window.innerHeight }];
+
+    monitors.forEach((mon, i) => {
+      const vf = document.createElement("div");
+      vf.className = "vf vf--scan";
+      vf.style.left = `${mon.logical_x - (layout?.virtual_x ?? 0)}px`;
+      vf.style.top = `${mon.logical_y - (layout?.virtual_y ?? 0)}px`;
+      vf.style.width = `${mon.logical_width}px`;
+      vf.style.height = `${mon.logical_height}px`;
+      vf.innerHTML = `
+        <span class="vf-frame"></span>
+        <span class="vf-label vf-tl"><span class="vf-rec-dot"></span>REC</span>
+        <span class="vf-label vf-tr">SCREEN ${i + 1}</span>
+        <span class="vf-label vf-bl"><span class="vf-state"></span></span>
+        <span class="vf-label vf-br"><span class="vf-tc"></span></span>
+      `;
+      (vf.querySelector(".vf-state") as HTMLElement).textContent = stateText;
+      this.stopScanClocks.push(startTimecode(vf.querySelector(".vf-tc") as HTMLElement));
+      this.scanContainer.appendChild(vf);
+    });
+  }
+
+  public hideScanning() {
+    this.stopScanClocks.forEach((stop) => stop());
+    this.stopScanClocks = [];
+    this.scanContainer.innerHTML = "";
   }
 
   /**
@@ -117,15 +190,9 @@ export class OverlayComponent {
 
     bubble.innerHTML = `
       <div class="callout-header">
-        <div class="callout-drag-handle" style="display: flex; align-items: center; gap: 6px; cursor: grab;" title="Drag to reposition">
-          <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" style="opacity: 0.4;">
-            <circle cx="2" cy="2" r="1.3"></circle>
-            <circle cx="8" cy="2" r="1.3"></circle>
-            <circle cx="2" cy="7" r="1.3"></circle>
-            <circle cx="8" cy="7" r="1.3"></circle>
-            <circle cx="2" cy="12" r="1.3"></circle>
-            <circle cx="8" cy="12" r="1.3"></circle>
-          </svg>
+        <div class="callout-drag-handle" title="Drag to reposition">
+          ${DRAG_GRIP_SVG}
+          <span class="callout-dot" aria-hidden="true"></span>
           <span class="callout-label">${escapeHtml(label)}</span>
         </div>
         <div class="callout-header-actions">
@@ -133,7 +200,7 @@ export class OverlayComponent {
             ${COPY_ICON_SVG}
             <span class="copy-label">Copy</span>
           </button>
-          <button class="callout-close" title="Close and Reset to Input">✕</button>
+          <button class="callout-close" title="Close and Reset to Input">${CLOSE_ICON_SVG}</button>
         </div>
       </div>
       <div class="callout-text">${renderMarkdown(args.text)}</div>
@@ -154,6 +221,7 @@ export class OverlayComponent {
 
     makeDraggable(bubble);
     this.highlightsContainer.appendChild(bubble);
+    this.mountPanelPicture(bubble);
   }
 
   public renderHighlight(target: HighlightElementArgs, layout?: any) {
@@ -184,6 +252,9 @@ export class OverlayComponent {
     box.style.top = `${y}px`;
     box.style.width = `${width}px`;
     box.style.height = `${height}px`;
+    box.style.setProperty("--hl-h", `${height}px`); // how far the scan line travels
+    // four brackets that fly in and lock onto the target (overlay-vhs.css)
+    box.innerHTML = `<i class="hl-corner hl-tl"></i><i class="hl-corner hl-tr"></i><i class="hl-corner hl-bl"></i><i class="hl-corner hl-br"></i>`;
 
     // 2. Draw Anchored Callout Bubble (Draggable)
     const bubble = document.createElement("div");
@@ -204,15 +275,9 @@ export class OverlayComponent {
 
     bubble.innerHTML = `
       <div class="callout-header">
-        <div class="callout-drag-handle" style="display: flex; align-items: center; gap: 6px; cursor: grab;" title="Drag to reposition">
-          <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" style="opacity: 0.4;">
-            <circle cx="2" cy="2" r="1.3"></circle>
-            <circle cx="8" cy="2" r="1.3"></circle>
-            <circle cx="2" cy="7" r="1.3"></circle>
-            <circle cx="8" cy="7" r="1.3"></circle>
-            <circle cx="2" cy="12" r="1.3"></circle>
-            <circle cx="8" cy="12" r="1.3"></circle>
-          </svg>
+        <div class="callout-drag-handle" title="Drag to reposition">
+          ${DRAG_GRIP_SVG}
+          <span class="callout-dot" aria-hidden="true"></span>
           <span class="callout-label">${escapeHtml(target.label)}</span>
         </div>
         <div class="callout-header-actions">
@@ -220,7 +285,7 @@ export class OverlayComponent {
             ${COPY_ICON_SVG}
             <span class="copy-label">Copy</span>
           </button>
-          <button class="callout-close" title="Close and Reset to Input">✕</button>
+          <button class="callout-close" title="Close and Reset to Input">${CLOSE_ICON_SVG}</button>
         </div>
       </div>
       <div class="callout-text">${renderMarkdown(target.explanation)}</div>
@@ -241,8 +306,27 @@ export class OverlayComponent {
 
     makeDraggable(bubble);
 
+    // Arrow beside the target, on whichever side has room, nudging toward it
+    const monLeft = mon.logical_x - usedLayout.virtual_x;
+    const monRight = monLeft + mon.logical_width;
+    const side = x - 60 >= monLeft || x + width + 60 > monRight ? "left" : "right";
+    const arrow = document.createElement("div");
+    arrow.className = `hl-arrow hl-arrow--${side}`;
+    arrow.innerHTML = pointerArrow;
+    arrow.style.left = `${side === "left" ? x - 14 - 36 : x + width + 14}px`;
+    arrow.style.top = `${Math.round(y + height / 2 - 8)}px`;
+
     this.highlightsContainer.appendChild(box);
+    this.highlightsContainer.appendChild(arrow);
     this.highlightsContainer.appendChild(bubble);
+    this.mountPanelPicture(bubble);
+
+    // The placement above assumes 420px; the bubble can run wider. Keep it on its monitor.
+    const monRightEdge = monLeft + mon.logical_width - 10;
+    const bubbleRight = bubbleX + bubble.offsetWidth;
+    if (bubbleRight > monRightEdge) {
+      bubble.style.left = `${Math.max(monLeft + 10, monRightEdge - bubble.offsetWidth)}px`;
+    }
   }
 
   public renderWidget(widget: ShowOutputWidgetArgs, onActionClick?: (shortcut?: string[]) => void, layout?: any) {
@@ -250,34 +334,23 @@ export class OverlayComponent {
     card.className = "glass-panel widget-card";
 
     let contentHtml = `
-      <div class="widget-title" style="display: flex; align-items: center; justify-content: space-between;">
-        <div class="widget-drag-area" style="display: flex; align-items: center; gap: 8px; cursor: grab;" title="Drag to reposition">
-          <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" style="opacity: 0.4;">
-            <circle cx="2" cy="2" r="1.3"></circle>
-            <circle cx="8" cy="2" r="1.3"></circle>
-            <circle cx="2" cy="7" r="1.3"></circle>
-            <circle cx="8" cy="7" r="1.3"></circle>
-            <circle cx="2" cy="12" r="1.3"></circle>
-            <circle cx="8" cy="12" r="1.3"></circle>
-          </svg>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 11 12 14 22 4"></polyline>
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-          </svg>
-          <span>${escapeHtml(widget.title)}</span>
+      <div class="widget-title">
+        <div class="widget-drag-area" title="Drag to reposition">
+          ${DRAG_GRIP_SVG}
+          <span class="widget-title-text">${escapeHtml(widget.title)}</span>
         </div>
         <div class="callout-header-actions">
           <button class="callout-action-btn widget-copy-btn" title="Copy content to clipboard">
             ${COPY_ICON_SVG}
             <span class="copy-label">Copy</span>
           </button>
-          <button class="callout-close widget-close" title="Close and Reset to Input">✕</button>
+          <button class="callout-close widget-close" title="Close and Reset to Input">${CLOSE_ICON_SVG}</button>
         </div>
       </div>
     `;
 
     if (widget.items && widget.items.length > 0) {
-      contentHtml += `<div class="checklist-items" style="display: flex; flex-direction: column; gap: 8px;">`;
+      contentHtml += `<div class="checklist-items">`;
       for (const item of widget.items) {
         contentHtml += `
           <label class="checklist-item">
@@ -291,9 +364,7 @@ export class OverlayComponent {
 
     if (widget.code) {
       contentHtml += `
-        <div style="background: rgba(14,16,22,0.85); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); font-family: var(--font-mono); font-size: 12px; overflow-x: auto; user-select: text; -webkit-user-select: text;">
-          <code style="user-select: text; -webkit-user-select: text; color: #38bdf8;">${escapeHtml(widget.code)}</code>
-        </div>
+        <pre class="widget-code"><code>${escapeHtml(widget.code)}</code></pre>
       `;
     }
 
@@ -359,6 +430,7 @@ export class OverlayComponent {
     }
 
     this.widgetsContainer.appendChild(card);
+    this.mountPanelPicture(card);
     makeDraggable(this.widgetsContainer);
   }
 

@@ -1,8 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 :root {
-  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Advent Pro", "Helvetica Neue", Arial, sans-serif; /* bundled via fonts.css */
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Liquid Glass Palette - Ash / Neutral Grey */
   --glass-bg: rgba(24, 26, 30, 0.78);
@@ -48,6 +47,7 @@ html, body {
   background: transparent !important;
   font-family: var(--font-sans);
   color: var(--text-main);
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -216,9 +216,9 @@ html, body {
   border: none;
   outline: none;
   color: rgba(255, 255, 255, 0.95);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
+  font-family: var(--font-sans);
   font-size: 14.5px;
-  font-weight: 450;
+  font-weight: 500;
   letter-spacing: -0.15px;
   line-height: 1.45;
   resize: none;
@@ -233,7 +233,7 @@ html, body {
 
 .palette-input::placeholder {
   color: rgba(255, 255, 255, 0.36);
-  font-weight: 400;
+  font-weight: 500;
   font-size: 14px;
 }
 
@@ -266,7 +266,7 @@ html, body {
   background: rgba(255, 255, 255, 0.06);
   border: none;
   border-radius: var(--radius-full);
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.65);
 }
@@ -317,11 +317,6 @@ html, body {
 .voice-btn.clear-btn:hover {
   background: rgba(255, 51, 75, 0.2);
   color: #ff4d61;
-}
-
-.voice-btn.logout-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
 }
 
 .voice-btn.audio-btn.muted {
@@ -442,7 +437,7 @@ html, body {
 }
 
 .callout-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.4px;
   color: var(--accent-primary);
@@ -680,7 +675,7 @@ html, body {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-main);
   cursor: pointer;
@@ -727,7 +722,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-main);
   opacity: 0;
