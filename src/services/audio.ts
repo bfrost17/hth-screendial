@@ -6,6 +6,12 @@ export interface RecordedAudio {
   mimeType: string;
 }
 
+/** RMS (0..1) below which the mic is considered silent. */
+const SILENCE_RMS_THRESHOLD = 0.02;
+/** How long the mic must stay below the threshold, after speech has started, before auto-stopping. */
+const SILENCE_DURATION_MS = 1500;
+const SILENCE_CHECK_INTERVAL_MS = 100;
+
 export class AudioManager {
   private sounds: Map<string, HTMLAudioElement> = new Map();
   private mediaRecorder: MediaRecorder | null = null;
@@ -14,6 +20,16 @@ export class AudioManager {
   private isAudioEnabled: boolean = false;
   private speechAudio: HTMLAudioElement | null = null;
   private elevenLabs: ElevenLabsService;
+
+  private silenceAudioContext: AudioContext | null = null;
+  private silenceCheckIntervalId: number | null = null;
+  private hasDetectedSpeech: boolean = false;
+  private silenceStartedAt: number | null = null;
+
+  /** Called when recording auto-stops because the mic went quiet for `SILENCE_DURATION_MS`
+   * after speech was heard. The caller is responsible for actually stopping/processing
+   * (see main.ts, which just re-runs the same toggle it uses for a manual mic click). */
+  public onAutoStop?: () => void;
 
   constructor(
     initialAudioEnabled: boolean = false,
@@ -84,6 +100,7 @@ export class AudioManager {
       this.mediaRecorder.start();
       this.isRecording = true;
       this.playSound("listening_started");
+      this.startSilenceMonitoring(stream);
       return true;
     } catch (err) {
       console.error("Microphone access error:", err);
@@ -91,8 +108,68 @@ export class AudioManager {
     }
   }
 
+  /**
+   * Watches the recording stream's volume and calls `onAutoStop` once speech has been
+   * heard and then the mic stays quiet for `SILENCE_DURATION_MS`. Waiting for speech first
+   * avoids stopping immediately if there's a pause before the user starts talking (e.g.
+   * right after the wake word triggers recording).
+   */
+  private startSilenceMonitoring(stream: MediaStream) {
+    this.hasDetectedSpeech = false;
+    this.silenceStartedAt = null;
+
+    try {
+      const context = new AudioContext();
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      this.silenceAudioContext = context;
+
+      const data = new Uint8Array(analyser.fftSize);
+      this.silenceCheckIntervalId = window.setInterval(() => {
+        analyser.getByteTimeDomainData(data);
+        let sumSquares = 0;
+        for (let i = 0; i < data.length; i++) {
+          const normalized = (data[i] - 128) / 128;
+          sumSquares += normalized * normalized;
+        }
+        const rms = Math.sqrt(sumSquares / data.length);
+
+        if (rms >= SILENCE_RMS_THRESHOLD) {
+          this.hasDetectedSpeech = true;
+          this.silenceStartedAt = null;
+          return;
+        }
+
+        if (!this.hasDetectedSpeech) return; // still waiting for the user to start talking
+
+        if (this.silenceStartedAt === null) {
+          this.silenceStartedAt = performance.now();
+        } else if (performance.now() - this.silenceStartedAt >= SILENCE_DURATION_MS) {
+          this.stopSilenceMonitoring();
+          this.onAutoStop?.();
+        }
+      }, SILENCE_CHECK_INTERVAL_MS);
+    } catch (err) {
+      console.warn("[AudioManager] Silence detection unavailable; falling back to manual stop only:", err);
+    }
+  }
+
+  private stopSilenceMonitoring() {
+    if (this.silenceCheckIntervalId !== null) {
+      window.clearInterval(this.silenceCheckIntervalId);
+      this.silenceCheckIntervalId = null;
+    }
+    if (this.silenceAudioContext) {
+      void this.silenceAudioContext.close();
+      this.silenceAudioContext = null;
+    }
+  }
+
   public async stopRecording(): Promise<RecordedAudio | null> {
     if (!this.mediaRecorder || !this.isRecording) return null;
+    this.stopSilenceMonitoring();
 
     return new Promise((resolve, reject) => {
       this.mediaRecorder!.onstop = async () => {

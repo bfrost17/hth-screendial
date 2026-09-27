@@ -4,10 +4,12 @@ pub mod window_info;
 
 use tools::get_display_info::{GetDisplayInfoTool, DisplayInfo};
 use tools::screenshot::{ScreenshotTool, ScreenCapturePayload};
+use tools::wake_word::{self, WakeWordModelPaths};
 use window_info::{get_foreground_window, ActiveWindowInfo};
 
 use tauri::{
     menu::{Menu, MenuItem},
+    path::BaseDirectory,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Window,
 };
@@ -615,6 +617,33 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // "Screendial" wake-word listening. Non-fatal if the resources can't be
+            // resolved or the mic can't be opened: the tray/mic-button voice path must
+            // keep working regardless.
+            let resolve_model = |name: &str| {
+                app.path().resolve(format!("wakeword/{name}"), BaseDirectory::Resource)
+            };
+            match (
+                resolve_model("melspectrogram.onnx"),
+                resolve_model("embedding_model.onnx"),
+                resolve_model("screendial_wakeword.onnx"),
+            ) {
+                (Ok(melspectrogram), Ok(embedding), Ok(classifier)) => {
+                    let threshold = std::env::var("SCREENDIAL_WAKE_THRESHOLD")
+                        .ok()
+                        .and_then(|v| v.parse::<f32>().ok())
+                        .unwrap_or(0.5);
+                    wake_word::spawn(
+                        app.handle().clone(),
+                        WakeWordModelPaths { melspectrogram, embedding, classifier },
+                        threshold,
+                    );
+                }
+                _ => {
+                    eprintln!("[Screendial] Wake-word models not found as bundled resources; skipping wake-word listening.");
+                }
+            }
 
             Ok(())
         })

@@ -67,6 +67,8 @@ class ScreendialApp {
     this.appRoot = document.getElementById("app")!;
     this.elevenLabs = new ElevenLabsService();
     this.audio = new AudioManager(false, this.elevenLabs); // Audio output muted initially
+    // Auto-stop recording after 1.5s of silence, same as a manual mic click.
+    this.audio.onAutoStop = () => this.toggleVoice();
     this.gemini = new GeminiAgentService();
 
     // Always clear history on app launch
@@ -261,6 +263,16 @@ class ScreendialApp {
 
       await listen("trigger-voice", () => {
         this.toggleVoice();
+      });
+
+      // "Screendial" wake word (Rust-side, src-tauri/src/tools/wake_word.rs). Only starts
+      // a new recording — never toggles an in-progress one off just because the wake word
+      // fired again mid-command.
+      await listen("wake-word-detected", async () => {
+        if (!this.audio.recordingActive) {
+          await this.showPalette();
+          this.toggleVoice();
+        }
       });
 
       await listen<boolean>("window-visibility-changed", async (event) => {

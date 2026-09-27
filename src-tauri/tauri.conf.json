@@ -21,7 +21,10 @@
     "active": true,
     "targets": "all",
     "resources": {
-      "../.env.local": ".env.local"
+      "../.env.local": ".env.local",
+      "resources/wakeword/melspectrogram.onnx": "wakeword/melspectrogram.onnx",
+      "resources/wakeword/embedding_model.onnx": "wakeword/embedding_model.onnx",
+      "resources/wakeword/screendial_wakeword.onnx": "wakeword/screendial_wakeword.onnx"
     },
     "icon": [
       "icons/32x32.png",
