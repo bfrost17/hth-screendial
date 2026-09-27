@@ -1,4 +1,5 @@
 import { logToTerminal } from "./terminalLog";
+import { nativeHttpRequest } from "./nativeHttp";
 
 export const AUTH0_DOMAIN =
   import.meta.env.VITE_AUTH0_DOMAIN || "dev-f8tc8m2ocimu3olh.us.auth0.com";
@@ -34,10 +35,6 @@ interface Auth0UserInfo {
 
 /**
  * Robust parser for Auth0 error responses.
- * Auth0 returns different structures depending on the error type:
- * - Password policy: { name: "PasswordStrengthError", policy: "* At least 15 chars...", description: { rules: [...] } }
- * - Bad credentials: { error: "invalid_grant", error_description: "Wrong email or password." }
- * - Invalid signup: { name: "BadRequestError", description: "The user already exists." }
  */
 function extractAuth0ErrorMessage(rawBody: string, status: number): string {
   if (!rawBody || !rawBody.trim()) {
@@ -150,29 +147,26 @@ export class AuthService {
 
     logToTerminal("Auth0", `[SIGNUP] POST ${url}`);
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch (networkErr: any) {
-      logToTerminal("Auth0", `[SIGNUP] Network error: ${networkErr.message}`);
-      throw new Error(`Network failure: ${networkErr.message}`);
-    }
+    const res = await nativeHttpRequest(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-    logToTerminal("Auth0", `[SIGNUP] Status: ${res.status} ${res.statusText}`);
+    logToTerminal("Auth0", `[SIGNUP] Status: ${res.status}`);
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      logToTerminal("Auth0", `[SIGNUP] Error response from Auth0: ${errBody}`);
-      const friendlyMsg = extractAuth0ErrorMessage(errBody, res.status);
+    if (res.status < 200 || res.status >= 300) {
+      logToTerminal("Auth0", `[SIGNUP] Error response from Auth0: ${res.body}`);
+      const friendlyMsg = extractAuth0ErrorMessage(res.body, res.status);
       logToTerminal("Auth0", `[SIGNUP] Parsed error: "${friendlyMsg}"`);
       throw new Error(friendlyMsg);
     }
 
-    const data = await res.json();
+    let data: any = {};
+    try {
+      data = JSON.parse(res.body);
+    } catch {}
+
     logToTerminal("Auth0", `[SIGNUP] User successfully created in Auth0:`, {
       _id: data._id,
       email: data.email,
@@ -198,7 +192,6 @@ export class AuthService {
     }
 
     const url = `https://${AUTH0_DOMAIN}/oauth/token`;
-    // Auth0 password-realm grant connects directly to the Username-Password-Authentication directory
     const payload = {
       grant_type: "http://auth0.com/oauth/grant-type/password-realm",
       username: email,
@@ -210,29 +203,29 @@ export class AuthService {
 
     logToTerminal("Auth0", `[LOGIN] POST ${url}`);
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch (networkErr: any) {
-      logToTerminal("Auth0", `[LOGIN] Network error: ${networkErr.message}`);
-      throw new Error(`Network failure: ${networkErr.message}`);
-    }
+    const res = await nativeHttpRequest(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-    logToTerminal("Auth0", `[LOGIN] Status: ${res.status} ${res.statusText}`);
+    logToTerminal("Auth0", `[LOGIN] Status: ${res.status}`);
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      logToTerminal("Auth0", `[LOGIN] Error response from Auth0: ${errBody}`);
-      const friendlyMsg = extractAuth0ErrorMessage(errBody, res.status);
+    if (res.status < 200 || res.status >= 300) {
+      logToTerminal("Auth0", `[LOGIN] Error response from Auth0: ${res.body}`);
+      const friendlyMsg = extractAuth0ErrorMessage(res.body, res.status);
       logToTerminal("Auth0", `[LOGIN] Parsed error: "${friendlyMsg}"`);
       throw new Error(friendlyMsg);
     }
 
-    const tokens: Auth0TokenResponse = await res.json();
+    let tokens: Auth0TokenResponse;
+    try {
+      tokens = JSON.parse(res.body);
+    } catch (parseErr: any) {
+      logToTerminal("Auth0", `[LOGIN] Failed to parse token response: ${res.body}`);
+      throw new Error("Invalid response received from auth server.");
+    }
+
     logToTerminal("Auth0", `[LOGIN] Tokens received successfully (expires_in: ${tokens.expires_in}s)`);
 
     // Fetch user profile from Auth0 /userinfo
@@ -252,19 +245,25 @@ export class AuthService {
     const url = `https://${AUTH0_DOMAIN}/userinfo`;
     logToTerminal("Auth0", `[USERINFO] GET ${url}`);
 
-    const res = await fetch(url, {
+    const res = await nativeHttpRequest(url, {
+      method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     logToTerminal("Auth0", `[USERINFO] Status: ${res.status}`);
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      logToTerminal("Auth0", `[USERINFO] Failed: ${errBody}`);
+    if (res.status < 200 || res.status >= 300) {
+      logToTerminal("Auth0", `[USERINFO] Failed: ${res.body}`);
       throw new Error(`Failed to fetch user profile (HTTP ${res.status}).`);
     }
 
-    const info: Auth0UserInfo = await res.json();
+    let info: Auth0UserInfo;
+    try {
+      info = JSON.parse(res.body);
+    } catch {
+      throw new Error("Failed to parse userinfo response.");
+    }
+
     logToTerminal("Auth0", `[USERINFO] Profile fetched: ${info.email} (sub: ${info.sub})`);
 
     return {
