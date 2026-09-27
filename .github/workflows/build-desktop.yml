@@ -1,0 +1,67 @@
+name: Build Desktop App
+
+# Manual trigger only: this bakes API keys and DB credentials into the build
+# (see the demo-only tradeoff noted in database_connection.rs), so it should
+# only run when someone deliberately asks for a build, not on every push.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            artifact-name: screendial-macos
+            artifact-paths: |
+              src-tauri/target/release/bundle/macos/*.app
+              src-tauri/target/release/bundle/dmg/*.dmg
+          - platform: windows-latest
+            artifact-name: screendial-windows
+            artifact-paths: |
+              src-tauri/target/release/bundle/msi/*.msi
+              src-tauri/target/release/bundle/nsis/*.exe
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # .env.local is gitignored, so it doesn't exist on the runner. Rebuild it from
+      # repository secrets (Settings -> Secrets and variables -> Actions) using the
+      # same keys as the local .env.local file.
+      - name: Write .env.local from secrets
+        shell: bash
+        run: |
+          cat > .env.local <<'EOF'
+          VITE_GOOGLE_GEMINI_KEY=${{ secrets.VITE_GOOGLE_GEMINI_KEY }}
+          VITE_ELEVENLABS_API_KEY=${{ secrets.VITE_ELEVENLABS_API_KEY }}
+          VITE_ELEVENLABS_VOICE_ID=${{ secrets.VITE_ELEVENLABS_VOICE_ID }}
+          VITE_ELEVENLABS_STT_MODEL=${{ secrets.VITE_ELEVENLABS_STT_MODEL }}
+          VITE_ELEVENLABS_TTS_MODEL=${{ secrets.VITE_ELEVENLABS_TTS_MODEL }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          SCREENDIAL_DEMO_INSECURE_TLS=${{ secrets.SCREENDIAL_DEMO_INSECURE_TLS }}
+          VITE_AUTH0_DOMAIN=${{ secrets.VITE_AUTH0_DOMAIN }}
+          VITE_AUTH0_CLIENT_ID=${{ secrets.VITE_AUTH0_CLIENT_ID }}
+          EOF
+
+      - name: Build Tauri app
+        run: npx tauri build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-paths }}
+          if-no-files-found: error

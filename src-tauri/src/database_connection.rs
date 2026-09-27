@@ -1,10 +1,15 @@
 use postgres_native_tls::MakeTlsConnector;
+use tauri::{path::BaseDirectory, AppHandle, Manager};
 use tokio_postgres::{config::SslMode, Client};
 
-async fn connect() -> Result<Client, String> {
-    let env_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(".env.local");
+async fn connect(app: &AppHandle) -> Result<Client, String> {
+    // `.env.local` is bundled as a resource (see tauri.conf.json) so this resolves both in
+    // `tauri dev` and inside a packaged .app/.exe, instead of the dev machine's absolute
+    // source path baked in by CARGO_MANIFEST_DIR.
+    let env_path = app
+        .path()
+        .resolve(".env.local", BaseDirectory::Resource)
+        .map_err(|error| format!("Could not locate the bundled .env.local resource: {error}"))?;
     dotenvy::from_path(&env_path)
         .map_err(|error| format!("Could not load {}: {error}", env_path.display()))?;
 
@@ -51,13 +56,13 @@ async fn connect() -> Result<Client, String> {
 }
 
 #[tauri::command]
-pub async fn upsert_auth0_user_cmd(auth0_id: String) -> Result<i64, String> {
+pub async fn upsert_auth0_user_cmd(app: AppHandle, auth0_id: String) -> Result<i64, String> {
     let auth0_id = auth0_id.trim();
     if auth0_id.is_empty() {
         return Err("An Auth0 user ID is required to save the user.".to_string());
     }
 
-    let client = connect().await?;
+    let client = connect(&app).await?;
     let row = client
         .query_one(
             "INSERT INTO public.users (auth0_id)
@@ -75,6 +80,7 @@ pub async fn upsert_auth0_user_cmd(auth0_id: String) -> Result<i64, String> {
 
 #[tauri::command]
 pub async fn save_gemini_interaction_cmd(
+    app: AppHandle,
     user_id: i64,
     query: String,
     response: String,
@@ -85,7 +91,7 @@ pub async fn save_gemini_interaction_cmd(
         return Err("A valid user, query, and Gemini response are required.".to_string());
     }
 
-    let client = connect().await?;
+    let client = connect(&app).await?;
     let inserted = client
         .execute(
             "INSERT INTO public.interactions (user_id, query, response)
