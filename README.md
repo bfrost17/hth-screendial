@@ -14,12 +14,12 @@
   - `overlay`: Normal text display tool for regular guidance text.
   - `code_overlay`: Formatted text display tool for code snippet outputs.
   - `to_do_overlay`: Interactive checklist display tool.
-  - `voice`: Spoken guidance, synthesized ahead of time so playback starts in lockstep with whatever visual tools accompany it (see [Voice Pipeline](#voice-pipeline) below).
-- **Multi-Monitor Simultaneous Capture:** Captures every active display at once per query. On macOS this goes through **ScreenCaptureKit** (`src-tauri/src/tools/macos_capture.rs`), not the deprecated `CGWindowListCreateImage` path — see [Screenshot Capture on macOS](#screenshot-capture-on-macos).
+  - `voice`: Spoken guidance, synthesized ahead of time so playback starts in lockstep with whatever visual tools accompany it (see **Voice Pipeline** below).
+- **Multi-Monitor Simultaneous Capture:** Captures every active display at once per query. On macOS this goes through **ScreenCaptureKit** (`src-tauri/src/tools/macos_capture.rs`), not the deprecated `CGWindowListCreateImage` path (see **Packaging** below for the permission it needs).
 - **Voice Pipeline:** Push-to-talk recording, transcribed via **ElevenLabs Speech-to-Text** (falling back to sending raw audio to Gemini if unavailable), with spoken responses synthesized via **ElevenLabs Text-to-Speech** (falling back to the browser's built-in speech synthesis).
-- **Sign-In Required (Auth0):** The app is gated behind an Auth0-backed sign-in/sign-up modal on launch. A working default tenant is baked in for local development (see [Prerequisites](#prerequisites)); override it with your own `VITE_AUTH0_DOMAIN` / `VITE_AUTH0_CLIENT_ID` if needed.
-- **Cloud Interaction History (optional):** Signed-in text queries and Gemini's text responses can be persisted to a Postgres/TigerData database (see [Configure Interaction Storage](#3-configure-interaction-storage-optional)). Screenshots, audio, and secrets are never stored.
-- **Command Palette:** Floating translucent search bar with active-application detection, voice input, mute toggle, clear-conversation, sign-out, and minimize controls, opened from the system tray (see [Controls](#️-controls)).
+- **Sign-In Required (Auth0):** The app is gated behind an Auth0-backed sign-in/sign-up modal on launch. A working default tenant is baked in for local development (see **Prerequisites** below); override it with your own `VITE_AUTH0_DOMAIN` / `VITE_AUTH0_CLIENT_ID` if needed.
+- **Cloud Interaction History (optional):** Signed-in text queries and Gemini's text responses can be persisted to a Postgres/TigerData database (see **Installation & Local Run** below). Screenshots, audio, and secrets are never stored.
+- **Command Palette:** Floating translucent search bar with active-application detection, voice input, mute toggle, clear-conversation, sign-out, and minimize controls, opened from the system tray (see **Controls** below).
 - **System Tray Integration:** Persistent menu bar icon and dropdown menu for opening the palette, toggling voice, showing/hiding all Screendial windows, clearing overlay highlights, and quitting.
 
 ---
@@ -94,7 +94,7 @@ The command bar's icon row, left to right: **mic** (voice command) · **speaker*
    VITE_AUTH0_DOMAIN=your_tenant.us.auth0.com
    VITE_AUTH0_CLIENT_ID=your_auth0_client_id
    ```
-   `VITE_`-prefixed values are inlined into the compiled frontend JS at build time (by Vite), so they end up readable inside any built `.app`/installer you distribute. Use real keys only for local/private demos; see [Packaging](#-packaging-standalone-app-app--exe) below for the tradeoffs of shipping a build with real keys embedded.
+   `VITE_`-prefixed values are inlined into the compiled frontend JS at build time (by Vite), so they end up readable inside any built `.app`/installer you distribute. Use real keys only for local/private demos; see **Packaging** below for the tradeoffs of shipping a build with real keys embedded.
 
 3. **Configure interaction storage (optional):**
    Add `DATABASE_URL=postgresql://...` to the same `.env.local` file. Create the `public.users` and `public.interactions` tables using the TigerData schema before launching the app. Screendial stores the Auth0 subject in `users.auth0_id` and successful text-only Gemini queries and text responses in `interactions`; the `embedding` column remains NULL for now. Passwords, tokens, API keys, screenshots, and audio are not stored. This is persistence only — saved interactions are not used as a cache. If this isn't configured, the app still works; only cloud history is skipped.
