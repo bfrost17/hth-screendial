@@ -1,3 +1,4 @@
+mod database_connection;
 pub mod tools;
 pub mod window_info;
 
@@ -615,6 +616,8 @@ pub fn run() {
             get_active_window_cmd,
             set_click_through_cmd,
             update_interactive_rects_cmd,
+            database_connection::upsert_auth0_user_cmd,
+            database_connection::save_gemini_interaction_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
