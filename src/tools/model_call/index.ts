@@ -115,6 +115,7 @@ export class ModelCallTool {
     activeApp?: string;
     skill?: Skill;
     audioMimeType?: string;
+    onTextResponse?: (response: string) => void;
   }): Promise<ToolCall[]> {
     if (!this.hasApiKey()) {
       throw new Error("Gemini API key is not configured. Please set VITE_GOOGLE_GEMINI_KEY or VITE_GEMINI_API_KEY in your .env file.");
@@ -285,6 +286,7 @@ RULES FOR PRESENTATION:
         text: modelTextResponse,
         timestamp: Date.now()
       });
+      params.onTextResponse?.(modelTextResponse);
     }
 
     this.saveHistory();

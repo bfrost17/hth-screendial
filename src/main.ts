@@ -48,6 +48,8 @@ class ScreendialApp {
   private isPaletteOpen: boolean = false;
   private isAuthenticated: boolean = false;
   private desktopLayout: any = null;
+  private databaseUserId: number | null = null;
+  private databaseUserSubject: string | null = null;
 
   private clientTools: ClientTool[] = [
     new HighlightTool(),
@@ -133,6 +135,13 @@ class ScreendialApp {
   private handleAuthSuccess(user?: AuthUserProfile) {
     this.isAuthenticated = true;
     this.authModal.hide();
+    if (user) {
+      void this.registerDatabaseUser(user).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("[Screendial] Failed to persist Auth0 user:", error);
+        this.showStatus(`Cloud history is unavailable: ${message}`, false, "database_error", 6000);
+      });
+    }
 
     // Reveal Command Palette on launch
     setTimeout(() => {
@@ -153,12 +162,58 @@ class ScreendialApp {
   private async handleSignOut() {
     await authService.logout();
     this.isAuthenticated = false;
+    this.databaseUserId = null;
+    this.databaseUserSubject = null;
     this.palette.hide();
     this.isPaletteOpen = false;
     this.overlay.clear();
     this.authModal.show();
     this.audio.playSound("minimize");
     this.updateInteractiveRegions(true);
+  }
+
+  private async registerDatabaseUser(user: AuthUserProfile): Promise<number> {
+    if (!user.sub) {
+      throw new Error("The signed-in Auth0 profile is missing its subject.");
+    }
+    if (this.databaseUserId !== null && this.databaseUserSubject === user.sub) {
+      return this.databaseUserId;
+    }
+
+    const userId = await invoke<number>("upsert_auth0_user_cmd", {
+      auth0Id: user.sub,
+    });
+    this.databaseUserId = userId;
+    this.databaseUserSubject = user.sub;
+    return userId;
+  }
+
+  private async persistTextInteraction(query: string, response: string): Promise<void> {
+    try {
+      if (!query.trim() || !response.trim()) {
+        console.warn("[Screendial] Skipping cloud history save because the query or response is empty.");
+        return;
+      }
+
+      const user = await authService.getUser();
+      if (!user) {
+        throw new Error("No authenticated user is available to associate with this interaction.");
+      }
+      const userId = await this.registerDatabaseUser(user);
+      console.info(
+        `[Screendial] Saving interaction for database user ${userId} to public.interactions.`
+      );
+      await invoke("save_gemini_interaction_cmd", {
+        userId,
+        query,
+        response,
+      });
+      console.info("[Screendial] Saved Gemini interaction to cloud history.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[Screendial] Failed to persist Auth0/Gemini data:", error);
+      this.showStatus(`Cloud history could not be saved: ${message}`, false, "database_error", 6000);
+    }
   }
 
   public async showStatus(
@@ -413,17 +468,43 @@ class ScreendialApp {
       console.log(`[Screendial] Captured ${Object.keys(screens).length} screen(s) for processing`);
 
       // 2. Submit captures to Gemini Agent
-      const toolCalls = await this.gemini.analyzeDesktop(
+      let modelResponse: string | undefined;
+      const toolCalls: ToolCall[] = await this.gemini.analyzeDesktop(
         screens,
         query,
         audioBase64,
         activeApp,
         activeSkill,
-        audioMimeType
+        audioMimeType,
+        (response) => {
+          modelResponse = response;
+        }
       );
+      if (!modelResponse) {
+        const voiceResponse = toolCalls.find(
+          (toolCall) =>
+            toolCall.tool === "voice" &&
+            typeof toolCall.args.text === "string" &&
+            toolCall.args.text.trim()
+        );
+        modelResponse =
+          typeof voiceResponse?.args.text === "string"
+            ? voiceResponse.args.text
+            : toolCalls.length > 0
+              ? JSON.stringify(toolCalls)
+              : undefined;
+      }
+      const persistence =
+        query?.trim() && !audioBase64 && modelResponse
+          ? this.persistTextInteraction(query.trim(), modelResponse)
+          : undefined;
+      if (query?.trim() && !audioBase64 && !modelResponse) {
+        console.warn("[Screendial] Gemini returned no text or tool calls; no interaction was saved.");
+      }
 
       // 3. Dispatch returned Tool Calls directly on this instance's overlay
       await this.dispatchTools(toolCalls);
+      await persistence;
     } catch (err: any) {
       console.error("[Screendial] Processing error:", err);
       this.showStatus(`Error: ${err.message || err}`, false, "error", 4000);

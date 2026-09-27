@@ -70,7 +70,12 @@
    ```
    `VITE_` values are embedded in the frontend build. Use these keys only for local/private demos; do not distribute a build containing real API keys.
 
-3. **Launch in Development Mode:**
+3. **Configure TigerData interaction storage:**
+   Add `DATABASE_URL=postgresql://...` to the ignored repository-root `.env.local` file. Create the `public.users` and `public.interactions` tables using the TigerData schema before launching the app. Screendial stores the Auth0 subject in `users.auth0_id` and successful text-only Gemini queries and text responses in `interactions`; the `embedding` column remains NULL for now. Passwords, tokens, API keys, screenshots, and audio are not stored. This is persistence only—saved interactions are not used as a cache.
+
+   If certificate verification prevents a private demo database connection, you may temporarily add `SCREENDIAL_DEMO_INSECURE_TLS=true` to `.env.local`. This disables TLS certificate verification and makes the connection vulnerable to interception; keep the database private, use this only on a trusted network, and remove the setting after the demo. Certificate verification remains enabled by default.
+
+4. **Launch in Development Mode:**
    ```bash
    npm run tauri dev
    ```
