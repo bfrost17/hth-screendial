@@ -1,4 +1,5 @@
 import { authService, AuthUserProfile } from "../services/auth0";
+import { logToTerminal } from "../services/terminalLog";
 
 export class AuthModalComponent {
   private container: HTMLElement;
@@ -161,9 +162,9 @@ export class AuthModalComponent {
       }
 
       const mode = this.isSignUp ? "SIGNUP" : "LOGIN";
-      console.log(`[AuthModal] Form submitted — mode: ${mode}, email: ${email}`);
+      logToTerminal("AuthModal", `Form submitted: ${mode} for email "${email}"`);
 
-      this.setLoading(true);
+      this.setLoading(true, this.isSignUp ? "Creating Account..." : "Signing In...");
       this.hideError();
 
       try {
@@ -174,43 +175,59 @@ export class AuthModalComponent {
           user = await authService.login(email, password);
         }
 
-        console.log(`[AuthModal] ${mode} succeeded:`, user);
+        logToTerminal("AuthModal", `${mode} succeeded for user: ${user.email}`);
         this.setLoading(false);
         this.hide();
         this.onSuccessCallback(user);
       } catch (err: any) {
-        console.error(`[AuthModal] ${mode} failed:`, err.message);
-        console.error(`[AuthModal] Full error:`, err);
+        const errorText =
+          typeof err?.message === "string" && err.message.trim()
+            ? err.message
+            : typeof err === "string"
+            ? err
+            : "Authentication failed. Please check your credentials.";
+
+        logToTerminal("AuthModal", `${mode} failed: "${errorText}"`);
         this.setLoading(false);
-        this.showError(err.message || "Authentication failed.");
+        this.showError(errorText);
       }
     });
   }
 
-  private setLoading(loading: boolean) {
+  private setLoading(loading: boolean, label?: string) {
     const submitBtn = this.container.querySelector<HTMLButtonElement>("#auth-submit-btn")!;
     const btnText = this.container.querySelector<HTMLElement>(".auth-btn-text")!;
     const spinner = this.container.querySelector<HTMLElement>(".auth-spinner")!;
 
     if (loading) {
       submitBtn.disabled = true;
-      btnText.style.display = "none";
+      btnText.textContent = label || (this.isSignUp ? "Signing Up..." : "Signing In...");
       spinner.style.display = "block";
     } else {
       submitBtn.disabled = false;
-      btnText.style.display = "block";
+      btnText.textContent = this.isSignUp ? "Sign Up" : "Sign In";
       spinner.style.display = "none";
     }
   }
 
-  private showError(msg: string) {
+  private showError(msg: any) {
+    let cleanMsg = "";
+    if (typeof msg === "string") {
+      cleanMsg = msg;
+    } else if (msg && typeof msg === "object") {
+      cleanMsg = msg.message || JSON.stringify(msg);
+    } else {
+      cleanMsg = "Authentication failed. Please try again.";
+    }
+
     const errorBanner = this.container.querySelector<HTMLElement>("#auth-error")!;
-    errorBanner.textContent = msg;
+    errorBanner.textContent = cleanMsg;
     errorBanner.style.display = "block";
   }
 
   private hideError() {
     const errorBanner = this.container.querySelector<HTMLElement>("#auth-error")!;
+    errorBanner.textContent = "";
     errorBanner.style.display = "none";
   }
 }

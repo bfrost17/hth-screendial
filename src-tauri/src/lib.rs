@@ -30,6 +30,11 @@ pub struct InteractiveState {
 }
 
 #[tauri::command]
+fn log_terminal_cmd(message: String) {
+    println!("{}", message);
+}
+
+#[tauri::command]
 fn update_interactive_rects_cmd(
     state: tauri::State<InteractiveState>,
     rects: Vec<LogicalRect>,
@@ -533,6 +538,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            log_terminal_cmd,
             minimize_window_cmd,
             toggle_visibility_cmd,
             ensure_visible_cmd,
