@@ -2,6 +2,77 @@ use postgres_native_tls::MakeTlsConnector;
 use tauri::{path::BaseDirectory, AppHandle, Manager};
 use tokio_postgres::{config::SslMode, Client};
 
+/// Requested output dimensionality for Gemini's `gemini-embedding-001` model, matching
+/// the `public.interactions.embedding` column's `vector(768)` type.
+const EMBEDDING_DIMENSIONS: usize = 768;
+
+#[derive(serde::Deserialize)]
+struct EmbedContentResponse {
+    embedding: EmbeddingValues,
+}
+
+#[derive(serde::Deserialize)]
+struct EmbeddingValues {
+    values: Vec<f32>,
+}
+
+/// Calls Gemini's `gemini-embedding-001` model to embed a query/response pair, requesting
+/// a 768-dimension vector via `outputDimensionality` to match the database column.
+///
+/// Reuses the same API key the frontend uses for chat (`VITE_GOOGLE_GEMINI_KEY`,
+/// falling back to `VITE_GEMINI_API_KEY`), which `connect` has already loaded from
+/// `.env.local` into the process environment by the time this is called.
+async fn generate_interaction_embedding(query: &str, response: &str) -> Result<Vec<f32>, String> {
+    let api_key = std::env::var("VITE_GOOGLE_GEMINI_KEY")
+        .or_else(|_| std::env::var("VITE_GEMINI_API_KEY"))
+        .map_err(|_| {
+            "No Gemini API key is configured (VITE_GOOGLE_GEMINI_KEY or VITE_GEMINI_API_KEY)."
+                .to_string()
+        })?;
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return Err("The configured Gemini API key is empty.".to_string());
+    }
+
+    let text = format!("User: {query}\nAssistant: {response}");
+    let url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent";
+    let body = serde_json::json!({
+        "content": { "parts": [{ "text": text }] },
+        "outputDimensionality": EMBEDDING_DIMENSIONS
+    });
+
+    // The key is sent via header rather than as a `?key=...` query parameter so it can
+    // never end up embedded in a URL that gets echoed back into logs (e.g. reqwest's
+    // `Error` Display impl includes the request URL for connection/transport failures).
+    let http_response = reqwest::Client::new()
+        .post(url)
+        .header("x-goog-api-key", api_key)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|error| format!("Gemini embedding request failed: {error}"))?;
+
+    if !http_response.status().is_success() {
+        let status = http_response.status();
+        let error_text = http_response.text().await.unwrap_or_default();
+        return Err(format!("Gemini embedding API error ({status}): {error_text}"));
+    }
+
+    let parsed: EmbedContentResponse = http_response
+        .json()
+        .await
+        .map_err(|error| format!("Could not parse the Gemini embedding response: {error}"))?;
+
+    if parsed.embedding.values.len() != EMBEDDING_DIMENSIONS {
+        return Err(format!(
+            "Expected a {EMBEDDING_DIMENSIONS}-dimension embedding, got {}.",
+            parsed.embedding.values.len()
+        ));
+    }
+
+    Ok(parsed.embedding.values)
+}
+
 async fn connect(app: &AppHandle) -> Result<Client, String> {
     // `.env.local` is bundled as a resource (see tauri.conf.json) so this resolves both in
     // `tauri dev` and inside a packaged .app/.exe, instead of the dev machine's absolute
@@ -92,11 +163,22 @@ pub async fn save_gemini_interaction_cmd(
     }
 
     let client = connect(&app).await?;
+
+    // Embeddings are best-effort: if generation fails (missing key, rate limit, network
+    // error), we still save the interaction and simply leave `embedding` NULL.
+    let embedding = match generate_interaction_embedding(query, response).await {
+        Ok(values) => Some(pgvector::Vector::from(values)),
+        Err(error) => {
+            eprintln!("[Database] Could not generate an embedding for this interaction: {error}");
+            None
+        }
+    };
+
     let inserted = client
         .execute(
-            "INSERT INTO public.interactions (user_id, query, response)
-             VALUES ($1, $2, $3)",
-            &[&user_id, &query, &response],
+            "INSERT INTO public.interactions (user_id, query, response, embedding)
+             VALUES ($1, $2, $3, $4)",
+            &[&user_id, &query, &response, &embedding],
         )
         .await
         .map_err(|error| format!("Could not save the Gemini interaction: {error}"))?;

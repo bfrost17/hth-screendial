@@ -29,6 +29,8 @@ native-tls = "0.2"
 postgres-native-tls = "0.5"
 tokio = { version = "1", features = ["rt"] }
 tokio-postgres = "0.7"
+pgvector = { version = "0.4", features = ["postgres"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
 ort = "=2.0.0-rc.13"
 cpal = "0.15"
 
