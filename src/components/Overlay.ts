@@ -1,7 +1,6 @@
 import { marked } from "marked";
 import { HighlightElementArgs, ShowOutputWidgetArgs } from "../tools/types";
 import { pointerArrow, startTimecode } from "../brand/ui";
-import { BarPicture, mountBarPicture } from "../brand/bar-picture";
 
 const COPY_ICON_SVG = `<svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 const CHECK_ICON_SVG = `<svg class="check-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
@@ -41,8 +40,6 @@ export class OverlayComponent {
   private highlightsContainer: HTMLElement;
   private widgetsContainer: HTMLElement;
   private stopScanClocks: Array<() => void> = [];
-  /** The navbar's picture behind each output panel; torn down with the panels. */
-  private panelPictures: BarPicture[] = [];
   private onDismissAndReset?: () => void;
   private desktopLayout: any = null;
 
@@ -93,29 +90,8 @@ export class OverlayComponent {
   }
 
   public clear() {
-    this.panelPictures.forEach((picture) => picture.destroy());
-    this.panelPictures = [];
     this.highlightsContainer.innerHTML = "";
     this.widgetsContainer.innerHTML = "";
-  }
-
-  /**
-   * Puts the navbar's picture (tape + waves + scrim) behind a panel, on its own clipped
-   * layer. Calmer than the bar: panels carry paragraphs, not one line.
-   */
-  private mountPanelPicture(panel: HTMLElement) {
-    const layer = document.createElement("span");
-    layer.className = "bar-picture panel-picture";
-    layer.setAttribute("aria-hidden", "true");
-    layer.innerHTML = `<span class="bar-scrim panel-scrim"></span>`;
-    panel.prepend(layer);
-    this.panelPictures.push(
-      mountBarPicture(layer, {
-        intensity: 0.26,
-        wavesStrength: 0.6,
-        waves: { speed: 1.8, zoom: 0.5, pointer: { pan: 120, tilt: 12, ease: 0.07 } },
-      })
-    );
   }
 
   public setLayout(layout: any) {
@@ -221,7 +197,6 @@ export class OverlayComponent {
 
     makeDraggable(bubble);
     this.highlightsContainer.appendChild(bubble);
-    this.mountPanelPicture(bubble);
   }
 
   public renderHighlight(target: HighlightElementArgs, layout?: any) {
@@ -319,7 +294,6 @@ export class OverlayComponent {
     this.highlightsContainer.appendChild(box);
     this.highlightsContainer.appendChild(arrow);
     this.highlightsContainer.appendChild(bubble);
-    this.mountPanelPicture(bubble);
 
     // The placement above assumes 420px; the bubble can run wider. Keep it on its monitor.
     const monRightEdge = monLeft + mon.logical_width - 10;
@@ -430,7 +404,6 @@ export class OverlayComponent {
     }
 
     this.widgetsContainer.appendChild(card);
-    this.mountPanelPicture(card);
     makeDraggable(this.widgetsContainer);
   }
 

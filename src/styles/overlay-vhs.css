@@ -287,9 +287,8 @@
 }
 
 /* --------------------------------------------------------------------------
-   Guidance callouts + output widgets: the navbar's UI as a panel. The same picture
-   (tape + waves) on a clipped, rounded, see-through layer, a denser scrim for
-   paragraphs, a hairline edge, and the bar's dark-disc controls.
+   Guidance callouts + output widgets: the navbar's UI as a panel, on a static
+   ash-grey glass plate, with a hairline edge and the bar's dark-disc controls.
    -------------------------------------------------------------------------- */
 
 .callout-bubble,
@@ -299,9 +298,10 @@
   isolation: isolate;
   border: 0;
   border-radius: var(--bar-radius);
-  background: rgba(0, 16, 30, 0.22);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  /* Static ash-grey glass, matching the input bar: no motion behind the panel. */
+  background: rgba(28, 30, 34, 0.78);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
   box-shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.6);
   color: var(--fg);
   font-family: var(--f-text);
@@ -318,13 +318,6 @@
   padding: 16px 18px 18px;
   gap: 14px;
   animation: plate-in 0.5s var(--ease-out) both;
-}
-
-/* the panel's contents sit over the picture and its scrim */
-.callout-bubble > :not(.bar-picture),
-.widget-card.glass-panel > :not(.bar-picture) {
-  position: relative;
-  z-index: 2;
 }
 
 /* hairline edge, as on the bar; volt while dragging */
@@ -354,15 +347,7 @@
   border-color: transparent;
 }
 
-/* Denser than the bar's scrim: the bar holds one line, a panel holds paragraphs. The
-   header band stays the most open, so the picture still reads. */
-.panel-scrim {
-  background:
-    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
-    linear-gradient(180deg, rgba(0, 10, 22, 0.5) 0, rgba(0, 10, 22, 0.72) 56px, rgba(0, 10, 22, 0.78) 100%);
-}
-
-/* over a moving picture: lift the copy off it, as the bar's input does */
+/* lift the copy off the glass, as the bar's input does */
 .callout-bubble,
 .widget-card.glass-panel {
   text-shadow: 0 1px 3px rgba(0, 5, 14, 0.85);

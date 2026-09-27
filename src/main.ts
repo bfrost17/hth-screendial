@@ -5,7 +5,6 @@ import "./styles/fonts.css";
 import "./styles/glass.css";
 import "./styles/palette-vhs.css";
 import "./styles/brand.css";
-import "./styles/tape.css";
 import "./styles/overlay-vhs.css";
 import { PaletteComponent } from "./components/Palette";
 import { OverlayComponent } from "./components/Overlay";

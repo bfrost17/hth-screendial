@@ -1,15 +1,14 @@
 import { lineArrow, logo } from "../brand/ui";
-import { pixelIcon } from "../brand/pixel-icons";
-import { BarPicture, mountBarPicture } from "../brand/bar-picture";
+import { icon } from "../brand/icons";
 
-/** Pixel toolbar icons (brand/pixel-icons.ts). */
+/** Toolbar icons (brand/icons.ts). */
 const PALETTE_ICONS = {
-  clear: pixelIcon("trash"),
-  audioOff: pixelIcon("sound-off"),
-  audioOn: pixelIcon("sound-on"),
-  logout: pixelIcon("logout"),
-  hide: pixelIcon("hide"),
-  mic: pixelIcon("mic"),
+  clear: icon("trash"),
+  audioOff: icon("volume-off"),
+  audioOn: icon("volume"),
+  logout: icon("logout"),
+  hide: icon("minimize"),
+  mic: icon("mic"),
 };
 
 export class PaletteComponent {
@@ -25,9 +24,6 @@ export class PaletteComponent {
   private brandIcon!: HTMLElement;
   private isVisible: boolean = false;
   private hasBeenMoved: boolean = false;
-  // the tape + waves behind the bar; runs only while the palette is open
-  private picture!: BarPicture;
-  private pictureOff = 0;
 
   private onSubmit: (query: string) => void;
   private onToggleVoice: () => void;
@@ -72,7 +68,6 @@ export class PaletteComponent {
       <div class="status-pill-container"></div>
 
       <div class="palette-box">
-        <span class="bar-picture" aria-hidden="true"><span class="bar-scrim"></span></span>
         <div class="palette-drag-handle" title="Drag to move">
           <svg width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
             <circle cx="2" cy="2" r="1.2"></circle><circle cx="6" cy="2" r="1.2"></circle>
@@ -111,7 +106,6 @@ export class PaletteComponent {
     this.clearButton = this.container.querySelector(".clear-btn")!;
     this.audioButton = this.container.querySelector(".audio-btn")!;
     this.voiceButton = this.container.querySelector(".mic-btn")!;
-    this.picture = mountBarPicture(this.container.querySelector(".bar-picture")!, { active: false });
   }
 
   public showStatus(
@@ -357,8 +351,6 @@ export class PaletteComponent {
       this.container.style.top = "96px";
       this.container.style.transform = "translateX(-50%)";
     }
-    window.clearTimeout(this.pictureOff);
-    this.picture.setActive(true);
     this.paletteBox.classList.add("visible");
     setTimeout(() => {
       this.inputElement.focus();
@@ -377,9 +369,6 @@ export class PaletteComponent {
     if (this.isVisible) {
       this.isVisible = false;
       this.paletteBox.classList.remove("visible");
-      // stop the picture once the fade-out (0.4s) has finished, not mid-fade
-      window.clearTimeout(this.pictureOff);
-      this.pictureOff = window.setTimeout(() => this.picture.setActive(false), 450);
       this.inputElement.blur();
       if (this.onClose) {
         this.onClose();

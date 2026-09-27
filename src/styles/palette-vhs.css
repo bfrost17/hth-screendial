@@ -25,14 +25,13 @@
   gap: 12px;
   min-height: 60px;
   padding: 9px 9px 9px 12px;
-  border: 0; /* the picture defines the edge; no volt outline */
+  border: 0;
   --bar-radius: 30px;
   border-radius: var(--bar-radius);
-  /* See-through: a light tint and the tape at 50% (tape.css), so the desktop reads
-     behind the bar. The scrim (tape.css) keeps the text column dark. */
-  background: rgba(0, 16, 30, 0.22);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  /* Static ash-grey glass: a clean, translucent plate over the desktop, no motion. */
+  background: rgba(30, 32, 38, 0.72);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
   box-shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.6);
   transform: translateY(-8px);
   /* hidden = out of compositing, so the full-screen overlay stops redrawing while idle */
@@ -66,7 +65,6 @@
   pointer-events: none;
 }
 
-/* the bar's own contents sit over the picture and its scrim (tape.css) */
 .palette-container .palette-box > .palette-drag-handle,
 .palette-container .palette-box > .palette-icon-brand,
 .palette-container .palette-box > .palette-input,
@@ -112,7 +110,7 @@
   font-size: 17px;
   font-weight: 500;
   letter-spacing: 0;
-  /* over a moving picture: full white, lifted off it by a soft dark shadow */
+  /* full white, lifted off the glass by a soft dark shadow */
   color: #fff;
   caret-color: var(--volt);
   text-shadow: 0 1px 3px rgba(0, 5, 14, 0.9); /* the bar is see-through: hold the text off anything */
@@ -120,7 +118,7 @@
 
 .palette-container .palette-input::placeholder {
   font-size: 17px;
-  color: rgba(233, 237, 242, 0.78); /* fg-faint (0.5) disappears when the tape flares */
+  color: rgba(233, 237, 242, 0.78); /* fg-faint (0.5) is too faint over the glass */
 }
 
 .palette-container .palette-badges {
